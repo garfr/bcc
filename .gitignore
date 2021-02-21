@@ -1,0 +1,6 @@
+.ccls
+*.bns
+objs/
+bcc
+a.out
+main
