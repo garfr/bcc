@@ -1,14 +1,13 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <lexer.h>
 #include <parser.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-
-#include <lexer.h>
 
 int main() {
     const char *filename = "test.bns";
@@ -39,6 +38,7 @@ int main() {
         exit(1);
     }
 
+    initErrors(mapped_file);
     Lexer *lex = newLexer(mapped_file, file_stats.st_size);
 
     Parser *pars = newParser(lex);
@@ -47,7 +47,12 @@ int main() {
         if (peekToken(lex).type == TOK_EOF) {
             break;
         }
-        printStmt(parseStmt(pars));
+        Stmt *stmt = parseStmt(pars);
+        if (errorsExist()) {
+            printErrors();
+            exit(1);
+        }
+        printStmt(stmt);
         printf("\n");
     }
 }

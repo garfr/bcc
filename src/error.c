@@ -1,11 +1,17 @@
 #include <error.h>
-
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* Fuck concurrency its global variable time */
+
 Error *errorQueue = NULL;
+
+const unsigned char *buffer;
+
+void initErrors(const unsigned char *newBuffer) { buffer = newBuffer; }
 
 void queueError(char *message, size_t start, size_t end) {
     Error *err = malloc(sizeof(Error));
@@ -49,3 +55,5 @@ char *dynamicSprintf(const char *format, ...) {
     vsprintf(buffer, format, args2);
     return buffer;
 }
+
+bool errorsExist() { return errorQueue != NULL; }
