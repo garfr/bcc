@@ -19,4 +19,4 @@ void queueError(char *message, size_t start, size_t end);
 void printErrors();
 char *dynamicSprintf(const char *format, ...);
 bool errorsExist();
-void initErrors(const unsigned char *newBuffer);
+void initErrors(const unsigned char *newBuffer, const char *newBufferName);

@@ -38,7 +38,8 @@ int main() {
         exit(1);
     }
 
-    initErrors(mapped_file);
+    initErrors(mapped_file, filename);
+
     Lexer *lex = newLexer(mapped_file, file_stats.st_size);
 
     Parser *pars = newParser(lex);

@@ -5,13 +5,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define BOLDRED "\033[1m\033[31m"
+#define BOLDWHITE "\033[1m\033[37m"
+#define RESET "\033[0m"
+#define RED "\033[31m"
+
 /* Fuck concurrency its global variable time */
 
 Error *errorQueue = NULL;
+const char *bufferName;
 
 const unsigned char *buffer;
 
-void initErrors(const unsigned char *newBuffer) { buffer = newBuffer; }
+void initErrors(const unsigned char *newBuffer, const char *newBufferName) {
+    buffer = newBuffer;
+    bufferName = newBufferName;
+}
 
 void queueError(char *message, size_t start, size_t end) {
     Error *err = malloc(sizeof(Error));
@@ -24,19 +33,88 @@ void queueError(char *message, size_t start, size_t end) {
     err->next = oldErr;
 }
 
-/* TODO: Improve error printing. */
-void printError(Error *err) {
-    printf("ERROR: %s.\n%zd - %zd\n\n", err->message, err->start, err->end);
+typedef struct {
+    size_t line_idx;
+    size_t line_start;
+    size_t line_end;
+    size_t column_start;
+    size_t column_end;
+} Location;
+
+Location calculateLocation(size_t start, size_t end) {
+    size_t line = 1;
+    size_t column = 1;
+    size_t i;
+    for (i = 0; i < start; i++) {
+        column++;
+        if (buffer[i] == '\n') {
+            line++;
+            column = 1;
+        }
+    }
+
+    Location ret;
+    size_t line_start;
+    for (line_start = start; line_start > 0; line_start--) {
+        if (i == '\n') {
+            break;
+        }
+    }
+    ret.line_start = line;
+    ret.line_idx = line_start;
+    ret.line_end = line;
+    ret.column_start = column;
+    ret.column_end = column;
+    for (size_t i = start; i < end; i++) {
+        ret.column_end++;
+        if (buffer[i] == '\n') {
+            ret.line_end++;
+            ret.column_end = 1;
+        }
+    }
+    return ret;
 }
 
-void printErrors(void) {
-    if (errorQueue == NULL) {
-        return;
+/* TODO: Improve error printing. */
+void printError(Error *err) {
+    Location loc = calculateLocation(err->start, err->end);
+
+    printf(BOLDWHITE);
+    printf("%s:%zd:%zd: ", bufferName, loc.line_start, loc.column_start);
+    printf(BOLDRED);
+    printf("error: ");
+    printf(BOLDWHITE);
+    printf("%s.\n", err->message);
+    printf(RESET);
+    printf("   %zd | \"", loc.line_start);
+    for (size_t i = loc.line_idx;; i++) {
+        if (buffer[i] == '\n') {
+            break;
+        }
+        putc(buffer[i], stdout);
     }
-    while (errorQueue != NULL) {
-        printError(errorQueue);
-        errorQueue = errorQueue->next;
+    printf("\"\n");
+    printf("        ");
+    for (size_t i = 0; i < loc.column_start - 1; i++) {
+        printf(" ");
     }
+    printf(BOLDRED);
+    for (size_t i = loc.column_start; i < loc.column_end + 1; i++) {
+        printf("~");
+    }
+    printf(RESET);
+    printf("\n");
+}
+
+void printErrorHelper(Error *err) {
+    if (err->next != NULL) {
+        printErrorHelper(err->next);
+    }
+    printError(err);
+}
+
+void printErrors() {
+    printErrorHelper(errorQueue);
     exit(1);
 }
 
