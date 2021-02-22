@@ -15,6 +15,3 @@ bcc: $(OBJ_FILES)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
-
-run: bcc
-	./bcc

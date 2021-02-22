@@ -9,8 +9,12 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-int main() {
-    const char *filename = "test.bns";
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        printf("ERROR: Usage \"bcc (filename) [flags]\".\n");
+        exit(1);
+    }
+    const char *filename = argv[1];
 
     int fd = open(filename, O_RDONLY);
 
