@@ -23,8 +23,10 @@ void printError(Error *err) {
     printf("ERROR: %s.\n%zd - %zd\n\n", err->message, err->start, err->end);
 }
 
-void printErrors(void) __attribute__((noreturn));
 void printErrors(void) {
+    if (errorQueue == NULL) {
+        return;
+    }
     while (errorQueue != NULL) {
         printError(errorQueue);
         errorQueue = errorQueue->next;
@@ -38,7 +40,7 @@ char *dynamicSprintf(const char *format, ...) {
     va_list args2;
     va_copy(args2, args);
 
-    size_t memNeeded = vsnprintf(NULL, 0, format, args);
+    size_t memNeeded = vsnprintf(NULL, 0, format, args) + 1;
     char *buffer = malloc(memNeeded * sizeof(char));
     if (buffer == NULL) {
         printf("Compiler internal error: Out of memory.\n");

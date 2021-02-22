@@ -48,8 +48,7 @@ int main() {
             break;
         }
         printStmt(parseStmt(pars));
+        printf("\n");
     }
-
-    printErrors();
 }
 

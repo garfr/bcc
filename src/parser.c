@@ -1,6 +1,8 @@
+#include <ctype.h>
 #include <error.h>
 #include <lexer.h>
 #include <parser.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <utils.h>
@@ -38,7 +40,7 @@ void printExpr(Expr *exp) {
         break;
     }
 
-    printf(" %zd-%zd\n", exp->start, exp->end);
+    printf(" %zd-%zd", exp->start, exp->end);
 }
 
 HashEntry *findInScope(Parser *parser, Symbol sym) {
@@ -52,7 +54,49 @@ HashEntry *findInScope(Parser *parser, Symbol sym) {
     return NULL;
 }
 
+/* Parses a symbol into a positive integer, ignoring the first number */
+int64_t parseSymbolToInt(Symbol sym) {
+    int64_t ret = 0;
+    for (size_t i = 1; i < sym.len; i++) {
+        if (!isdigit(sym.text[i])) {
+            return -1;
+        }
+        ret *= 10;
+        ret += sym.text[i] - '0';
+    }
+    return ret;
+}
+
+Type *parseType(Parser *parser) {
+    Type *ret;
+
+    Token tok = nextToken(parser->lex);
+    if (tok.type != TOK_SYM) {
+        queueError(dynamicSprintf("Expected type to be a single symbol, arrays "
+                                  "and pointers are not supported"),
+                   tok.start, tok.end);
+        printErrors();
+    }
+
+    switch (tok.sym.text[0]) {
+    case 's':
+        ret = malloc(sizeof(Type));
+        ret->type = TYP_SINT;
+        ret->intbits = parseSymbolToInt(tok.sym);
+        return ret;
+    default:
+        queueError(dynamicSprintf(
+                       "Expected type to be a symbol with first character 's' "
+                       "and ending with a number, not '%.*s'",
+                       tok.sym.len, tok.sym.text),
+                   tok.start, tok.end);
+        printErrors();
+        exit(1);
+    }
+}
+
 Expr *parseExpr(Parser *parser) {
+
     Expr *ret;
 
     Token tok = nextToken(parser->lex);
@@ -60,6 +104,8 @@ Expr *parseExpr(Parser *parser) {
     case TOK_INT:
         ret = exprFromToken(tok, EXP_INT);
         ret->intlit = tok.intnum;
+        ret->typeExpr = malloc(sizeof(Type));
+        ret->typeExpr->type = TYP_INTLIT;
         return ret;
     case TOK_SYM:
         ret = exprFromToken(tok, EXP_VAR);
@@ -73,6 +119,7 @@ Expr *parseExpr(Parser *parser) {
         }
         printErrors();
         ret->var = entry;
+        ret->typeExpr = ((TypedEntry *)entry->data)->type;
         return ret;
     default:
         queueError(dynamicSprintf("Expected an integer or variable name for "
@@ -82,33 +129,68 @@ Expr *parseExpr(Parser *parser) {
         /* This never gets called */ exit(1);
     }
 }
+char *stringOfType(Type *type) {
+    switch (type->type) {
+    case TYP_SINT:
+        return dynamicSprintf("TYP_SINT: 's%ld'", type->intbits);
+    case TYP_INTLIT:
+        return dynamicSprintf("TYP_INTLIT");
+    }
+    return NULL;
+}
+
+void printType(Type *type) {
+    switch (type->type) {
+    case TYP_SINT:
+        printf("TYP_SINT: 's%ld'", type->intbits);
+        break;
+    case TYP_INTLIT:
+        printf("TYP_INTLIT");
+    }
+}
 void printStmt(Stmt *stmt) {
     switch (stmt->type) {
     case STMT_DEC:
         printf("STMT_DEC: '");
         printSymbol(stmt->dec.var->id);
         printf("' : '");
-        printSymbol(stmt->dec.type);
+        printType(stmt->dec.type);
         printf("'");
         break;
     case STMT_DEC_ASSIGN:
         printf("STMT_DEC_ASSIGN: '");
         printSymbol(stmt->dec_assign.var->id);
         printf("' : '");
-        printSymbol(stmt->dec_assign.type);
+        printType(stmt->dec_assign.type);
         printf("' = (");
         printExpr(stmt->dec_assign.value);
-        printf("\b)");
+        printf(")");
         break;
     case STMT_ASSIGN:
-        printf("STMT_DEC_ASSIGN: '");
+        printf("STMT_ASSIGN: '");
+        printSymbol(stmt->assign.var->id);
         printf("' = (");
-        printExpr(stmt->dec_assign.value);
-        printf("\b)");
+        printExpr(stmt->assign.value);
+        printf(")");
         break;
     }
 
-    printf(" %zd-%zd\n", stmt->start, stmt->end);
+    printf(" %zd-%zd", stmt->start, stmt->end);
+}
+int compareTypes(Type *typ1, Type *typ2) {
+    if (typ1->type != typ2->type) {
+        return false;
+    }
+    switch (typ1->type) {
+    case TYP_SINT:
+        if (typ1->intbits != typ2->intbits) {
+            return false;
+        }
+        break;
+    case TYP_INTLIT:
+        break;
+    }
+    return true;
 }
 
 Stmt *stmtFromTwoTokens(Token tok1, Token tok2, enum StmtType type) {
@@ -119,11 +201,10 @@ Stmt *stmtFromTwoTokens(Token tok1, Token tok2, enum StmtType type) {
     return ret;
 }
 
-/* TODO: Make this take a type parameter */
-HashEntry *addToScope(Parser *parser, Symbol sym, Symbol type) {
-    Symbol *mallocedType = malloc(sizeof(Symbol));
-    *mallocedType = type;
-    return insertHashtbl(parser->currentScope->vars, sym, (void *)mallocedType);
+HashEntry *addToScope(Parser *parser, Symbol sym, Type *type) {
+    TypedEntry *value = malloc(sizeof(TypedEntry));
+    value->type = type;
+    return insertHashtbl(parser->currentScope->vars, sym, (void *)value);
 }
 
 Stmt *parseDec(Parser *parser, Token varTok) {
@@ -144,23 +225,15 @@ Stmt *parseDec(Parser *parser, Token varTok) {
         printErrors();
     }
 
-    /* TODO: Add more complex types */
-    Token typeTok = nextToken(parser->lex);
-    if (typeTok.type != TOK_SYM) {
-        queueError(dynamicSprintf(
-                       "Expected type name after ':' in variable declaration"),
-                   colonTok.start, colonTok.end);
-        printErrors();
-    }
-
+    Type *type = parseType(parser);
     Token semicolonOrEqual = nextToken(parser->lex);
 
     switch (semicolonOrEqual.type) {
     case TOK_SEMICOLON:
         retStmt = stmtFromTwoTokens(varTok, semicolonOrEqual, STMT_DEC);
-        retStmt->dec.type = typeTok.sym;
+        retStmt->dec.type = type;
 
-        HashEntry *entry = addToScope(parser, symTok.sym, typeTok.sym);
+        HashEntry *entry = addToScope(parser, symTok.sym, type);
         if (entry == NULL) {
             queueError(
                 dynamicSprintf(
@@ -174,6 +247,18 @@ Stmt *parseDec(Parser *parser, Token varTok) {
     case TOK_EQUAL: {
         Expr *exp = parseExpr(parser);
 
+        /* TODO: Do some sanity checks on the size of the integer */
+        if (compareTypes(exp->typeExpr, type) == false &&
+            (exp->typeExpr->type != TYP_INTLIT || type->type != TYP_SINT)) {
+            queueError(dynamicSprintf("Type of '%s' cannot be casted to "
+                                      "declared type of '%s'",
+                                      stringOfType(exp->typeExpr),
+                                      stringOfType(type)),
+                       exp->start, exp->end);
+            printErrors();
+            exit(1);
+        }
+
         Token semicolonTok = nextToken(parser->lex);
         if (semicolonTok.type != TOK_SEMICOLON) {
             queueError(dynamicSprintf("Expected ';' after expression.\n"),
@@ -182,9 +267,9 @@ Stmt *parseDec(Parser *parser, Token varTok) {
         }
         Stmt *stmt = stmtFromTwoTokens(varTok, semicolonTok, STMT_DEC_ASSIGN);
 
-        HashEntry *entry = addToScope(parser, symTok.sym, typeTok.sym);
+        HashEntry *entry = addToScope(parser, symTok.sym, type);
 
-        stmt->dec_assign.type = typeTok.sym;
+        stmt->dec_assign.type = type;
         stmt->dec_assign.var = entry;
         stmt->dec_assign.value = exp;
         return stmt;
@@ -209,7 +294,7 @@ Stmt *parseAssign(Parser *parser, Token symTok) {
     Expr *value = parseExpr(parser);
 
     Token semiTok = nextToken(parser->lex);
-    if (semiTok.type != TOK_EQUAL) {
+    if (semiTok.type != TOK_SEMICOLON) {
         queueError(
             dynamicSprintf("Expected ';' after expression in assignment"),
             semiTok.start, semiTok.end);

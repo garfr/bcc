@@ -2,10 +2,24 @@
 
 #include <lexer.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <utils.h>
 
 enum ExprType { EXP_INT, EXP_VAR };
 enum StmtType { STMT_DEC, STMT_DEC_ASSIGN, STMT_ASSIGN };
+
+enum TypeType {
+    TYP_SINT,
+    TYP_INTLIT,
+};
+
+typedef struct Type {
+    enum TypeType type;
+
+    union {
+        int64_t intbits;
+    };
+} Type;
 
 typedef struct Expr {
     size_t start;
@@ -13,6 +27,7 @@ typedef struct Expr {
 
     enum ExprType type;
 
+    Type *typeExpr;
     union {
         HashEntry *var;
         Symbol intlit;
@@ -29,13 +44,13 @@ typedef struct Stmt {
         struct {
             HashEntry *var;
             /* This will get its own type soon. TODO */
-            Symbol type;
+            Type *type;
         } dec;
 
         struct {
             HashEntry *var;
             /* This will get its own type soon. TODO */
-            Symbol type;
+            Type *type;
             Expr *value;
         } dec_assign;
         struct {
@@ -44,6 +59,11 @@ typedef struct Stmt {
         } assign;
     };
 } Stmt;
+
+/* Value of symbols hashed into symbol tables */
+typedef struct {
+    Type *type;
+} TypedEntry;
 
 /* upScope is NULL if its global */
 typedef struct Scope {
