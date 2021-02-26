@@ -146,15 +146,16 @@ Expr *parseExpr(Parser *parser) {
         case TOK_SYM:
             ret = exprFromToken(tok, EXP_VAR);
 
+            printf("'%.*s'\n", (int)tok.sym.len, tok.sym.text);
             HashEntry *entry = findInScope(parser, tok.sym);
             if (entry == NULL) {
                 queueError(dynamicSprintf("Cannot find variable: '%.*s' in any "
                                           "scope. Must be undeclared",
                                           tok.sym.len, (char *)tok.sym.text),
                            tok.start, tok.end);
+                /* Must fail */
+                printErrors();
             }
-            /* Must fail */
-            printErrors();
             ret->var = entry;
             ret->typeExpr = ((TypedEntry *)entry->data)->type;
             return ret;
