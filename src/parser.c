@@ -285,7 +285,7 @@ Stmt *parseDec(Parser *parser, Token varTok) {
                 queueError(
                     dynamicSprintf("Cannot redeclare variable: '%.*s' in "
                                    "the same scope",
-                                   entry->id.len, (char *)entry->id.text),
+                                   symTok.sym.len, (char *)symTok.sym.text),
                     retStmt->start, retStmt->end);
                 /* Must fail */
                 printErrors();
@@ -295,9 +295,12 @@ Stmt *parseDec(Parser *parser, Token varTok) {
         case TOK_EQUAL: {
             Expr *exp = parseExpr(parser);
 
+            Type *exprType = exp->typeExpr;
+            Type *varType = type;
+
             /* TODO: Do some sanity checks on the size of the integer */
-            if (compareTypes(exp->typeExpr, type) == false &&
-                (exp->typeExpr->type != TYP_INTLIT || type->type != TYP_SINT)) {
+            if (compareTypes(exprType, varType) == false &&
+                (exprType->type != TYP_INTLIT || varType->type != TYP_SINT)) {
                 queueError(dynamicSprintf("Type of '%s' cannot be casted to "
                                           "declared type of '%s'",
                                           stringOfType(exp->typeExpr),
@@ -310,19 +313,30 @@ Stmt *parseDec(Parser *parser, Token varTok) {
                 queueError(dynamicSprintf("Expected ';' after expression.\n"),
                            semicolonTok.start, semicolonTok.end);
                 printErrors();
+                exit(1);
             }
             Stmt *stmt =
                 stmtFromTwoTokens(varTok, semicolonTok, STMT_DEC_ASSIGN);
 
-            HashEntry *entry = addToScope(parser, symTok.sym, type);
+            HashEntry *entry = addToScope(parser, symTok.sym, varType);
+            if (entry == NULL) {
+                printf("ERROR COCCURED\n");
+                queueError(
+                    dynamicSprintf("Cannot redeclare variable: '%.*s' in "
+                                   "the same scope",
+                                   symTok.sym.len, (char *)symTok.sym.text),
+                    stmt->start, stmt->end);
+                /* Must fail */
+                printErrors();
+                exit(1);
+            }
 
             stmt->dec_assign.type = type;
             stmt->dec_assign.var = entry;
             stmt->dec_assign.value = exp;
             return stmt;
             default:
-                /* This never gets called */
-                printErrors();
+                /* Unreachable */
                 exit(1);
         }
     }
@@ -354,10 +368,24 @@ Stmt *parseAssign(Parser *parser, Token symTok) {
                    ret->start, ret->end);
         printErrors();
     }
+
+    Type *varType = ((TypedEntry *)entry->data)->type;
+    Type *exprType = value->typeExpr;
+
+    if (compareTypes(varType, exprType) == false &&
+        ((exprType->type != TYP_INTLIT) || ((varType->type != TYP_SINT)))) {
+        queueError(
+            dynamicSprintf("Type of '%s' cannot be casted to "
+                           "declared type of '%s'",
+                           stringOfType(value->typeExpr),
+                           stringOfType(((TypedEntry *)entry->data)->type)),
+            value->start, value->end);
+    }
     ret->assign.var = entry;
     ret->assign.value = value;
     return ret;
 }
+
 Stmt *parseStmt(Parser *parser) {
     Token tok = nextToken(parser->lex);
 
@@ -373,8 +401,27 @@ Stmt *parseStmt(Parser *parser) {
         case TOK_SYM:
             return parseAssign(parser, tok);
         default:
-            printErrors();
+            /* Unreachable */
             exit(1);
     }
 }
 
+AST *parseSource(Lexer *lex) {
+    Parser *parser = newParser(lex);
+    size_t currSize = 0;
+    Stmt **buffer = NULL;
+
+    for (;;) {
+        if (peekToken(parser->lex).type == TOK_EOF) {
+            break;
+        }
+        Stmt *stmt = parseStmt(parser);
+        buffer = realloc(buffer, sizeof(Stmt *) * (currSize + 1));
+        buffer[currSize++] = stmt;
+    }
+
+    AST *ret = malloc(sizeof(AST));
+    ret->stmts = buffer;
+    ret->numStmts = currSize;
+    return ret;
+}

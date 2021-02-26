@@ -8,6 +8,8 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <tac.h>
+#include <unistd.h>
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -36,29 +38,26 @@ int main(int argc, char *argv[]) {
     const unsigned char *mapped_file =
         mmap(NULL, file_stats.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 
+    if (file_stats.st_size <= 0) {
+        printf("ERROR: Source files cannot be completely empty.\n");
+        exit(1);
+    }
     if (mapped_file == MAP_FAILED) {
         printf("ERROR: Failed to memory map file: '%s' due to error: '%s'.\n",
                filename, strerror(errno));
         exit(1);
     }
 
-    initErrors(mapped_file, filename);
+    initErrors(mapped_file, file_stats.st_size, filename);
 
     Lexer *lex = newLexer(mapped_file, file_stats.st_size);
 
-    Parser *pars = newParser(lex);
+    AST *ast = parseSource(lex);
+    TAC *tac = convertAST(ast);
+    printTAC(tac);
 
-    for (;;) {
-        if (peekToken(lex).type == TOK_EOF) {
-            break;
-        }
-        Stmt *stmt = parseStmt(pars);
-        if (errorsExist()) {
-            printErrors();
-            exit(1);
-        }
-        printStmt(stmt);
-        printf("\n");
+    if (errorsExist()) {
+        printErrors();
     }
 }
 

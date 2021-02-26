@@ -5,9 +5,6 @@
 #include <stdint.h>
 #include <utils.h>
 
-enum ExprType { EXP_INT, EXP_VAR };
-enum StmtType { STMT_DEC, STMT_DEC_ASSIGN, STMT_ASSIGN };
-
 enum TypeType {
     TYP_SINT,
     TYP_INTLIT,
@@ -21,6 +18,8 @@ typedef struct Type {
     };
 } Type;
 
+enum ExprType { EXP_INT, EXP_VAR };
+
 typedef struct Expr {
     size_t start;
     size_t end;
@@ -33,6 +32,8 @@ typedef struct Expr {
         Symbol intlit;
     };
 } Expr;
+
+enum StmtType { STMT_DEC, STMT_DEC_ASSIGN, STMT_ASSIGN };
 
 typedef struct Stmt {
     size_t start;
@@ -60,6 +61,11 @@ typedef struct Stmt {
     };
 } Stmt;
 
+typedef struct {
+    Stmt **stmts;
+    size_t numStmts;
+} AST;
+
 /* Value of symbols hashed into symbol tables */
 typedef struct {
     Type *type;
@@ -83,3 +89,5 @@ Expr *parseExpr(Parser *parser);
 
 void printStmt(Stmt *stmt);
 Stmt *parseStmt(Parser *parser);
+
+AST *parseSource(Lexer *lex);

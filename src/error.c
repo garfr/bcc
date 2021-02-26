@@ -16,9 +16,12 @@ Error *errorQueue = NULL;
 const char *bufferName;
 
 const unsigned char *buffer;
+size_t bufferSize;
 
-void initErrors(const unsigned char *newBuffer, const char *newBufferName) {
+void initErrors(const unsigned char *newBuffer, size_t newBufferSize,
+                const char *newBufferName) {
     buffer = newBuffer;
+    bufferSize = newBufferSize;
     bufferName = newBufferName;
 }
 
@@ -35,6 +38,7 @@ void queueError(char *message, size_t start, size_t end) {
 
 typedef struct {
     size_t line_idx;
+    size_t line_idx_end;
     size_t line_start;
     size_t line_end;
     size_t column_start;
@@ -45,6 +49,7 @@ Location calculateLocation(size_t start, size_t end) {
     size_t line = 1;
     size_t column = 1;
     size_t i;
+
     for (i = 0; i < start; i++) {
         column++;
         if (buffer[i] == '\n') {
@@ -56,13 +61,20 @@ Location calculateLocation(size_t start, size_t end) {
     Location ret;
     size_t line_start;
     for (line_start = start; line_start > 0; line_start--) {
-        if (i == '\n') {
+        if (buffer[line_start] == '\n') {
             break;
         }
     }
     ret.line_start = line;
     ret.line_idx = line_start;
+    size_t line_end;
+    for (line_end = start; line_end < bufferSize; line_end++) {
+        if (buffer[line_end] == '\n') {
+            break;
+        }
+    }
     ret.line_end = line;
+    ret.line_idx_end = line_end;
     ret.column_start = column;
     ret.column_end = column;
     for (size_t i = start; i < end; i++) {
@@ -86,15 +98,12 @@ void printError(Error *err) {
     printf(BOLDWHITE);
     printf("%s.\n", err->message);
     printf(RESET);
-    printf("   %zd | \"", loc.line_start);
-    for (size_t i = loc.line_idx;; i++) {
-        if (buffer[i] == '\n') {
-            break;
-        }
-        putc(buffer[i], stdout);
+    printf("   %zd | ", loc.line_start);
+    for (size_t i = loc.line_idx + 1; i < loc.line_idx_end; i++) {
+        putchar(buffer[i]);
     }
-    printf("\"\n");
-    printf("        ");
+    printf("\n");
+    printf("     | ");
     for (size_t i = 0; i < loc.column_start - 1; i++) {
         printf(" ");
     }
