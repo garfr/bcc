@@ -20,7 +20,7 @@ typedef struct {
     union {
         Symbol intlit;
         HashEntry* var;
-        size_t tempnum;
+        Symbol temp;
     };
 } TACAddr;
 

@@ -21,7 +21,7 @@ void printAddr(TACAddr addr) {
             printSymbol(addr.intlit);
             break;
         case ADDR_TEMP:
-            printf("(temp: %zd)", addr.tempnum);
+            printf("(temp: %.*s)", (int)addr.temp.len, addr.temp.text + 1);
             break;
         case ADDR_EMPTY:
             break;

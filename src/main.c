@@ -1,3 +1,4 @@
+#include <codegen.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -54,7 +55,8 @@ int main(int argc, char *argv[]) {
 
     AST *ast = parseSource(lex);
     TAC *tac = convertAST(ast);
-    printTAC(tac);
+
+    generateCode(tac, ast->symTable, stdout);
 
     if (errorsExist()) {
         printErrors();

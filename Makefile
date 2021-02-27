@@ -15,3 +15,9 @@ bcc: $(OBJ_FILES)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+test: bcc
+	./bcc test.bns > test.asm
+	nasm -g -felf64 test.asm
+	gcc -g test.o
+	./a.out

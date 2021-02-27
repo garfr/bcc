@@ -146,7 +146,6 @@ Expr *parseExpr(Parser *parser) {
         case TOK_SYM:
             ret = exprFromToken(tok, EXP_VAR);
 
-            printf("'%.*s'\n", (int)tok.sym.len, tok.sym.text);
             HashEntry *entry = findInScope(parser, tok.sym);
             if (entry == NULL) {
                 queueError(dynamicSprintf("Cannot find variable: '%.*s' in any "
@@ -424,5 +423,6 @@ AST *parseSource(Lexer *lex) {
     AST *ret = malloc(sizeof(AST));
     ret->stmts = buffer;
     ret->numStmts = currSize;
+    ret->symTable = parser->currentScope->vars;
     return ret;
 }

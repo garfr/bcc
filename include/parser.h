@@ -64,6 +64,7 @@ typedef struct Stmt {
 typedef struct {
     Stmt **stmts;
     size_t numStmts;
+    Hashtbl *symTable;
 } AST;
 
 /* Value of symbols hashed into symbol tables */

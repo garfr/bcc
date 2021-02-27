@@ -1,5 +1,8 @@
 .ccls
 *.bns
+*.o
+*.asm
+*.out
 objs/
 bcc
 a.out
