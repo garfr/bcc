@@ -3,7 +3,7 @@
 // Part of BCC, which is MIT licensed
 // See https//opensource.org/licenses/MIT
 //
-//===----------------------------------------------------------------------===/
+//===----------------------------- About ----------------------------------===/
 //
 // Defines the types and provides prototypes for functions in error.c
 //

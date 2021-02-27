@@ -15,7 +15,7 @@ enum TokTypeBits {
     TOK_SEMICOLON_BITS = 1 << 2,
     TOK_EQUAL_BITS = 1 << 3,
     TOK_SYM_BITS = 1 << 4,
-    TOK_VAR_BITS = 1 << 5,
+    TOK_LET_BITS = 1 << 5,
 };
 
 Parser *newParser(Lexer *lex) {
@@ -377,13 +377,13 @@ Stmt *parseAssign(Parser *parser, Token symTok) {
 Stmt *parseStmt(Parser *parser) {
     Token tok = nextToken(parser->lex);
 
-    if (tok.type != TOK_VAR && tok.type != TOK_SYM) {
+    if (tok.type != TOK_LET && tok.type != TOK_SYM) {
         queueError(msprintf("Expeted 'var' or a symbol to begin a statement"),
                    tok.start, tok.end);
-        tok = continueUntil(parser->lex, TOK_VAR_BITS | TOK_SYM_BITS);
+        tok = continueUntil(parser->lex, TOK_LET_BITS | TOK_SYM_BITS);
     }
     switch (tok.type) {
-        case TOK_VAR:
+        case TOK_LET:
             return parseDec(parser, tok);
         case TOK_SYM:
             return parseAssign(parser, tok);

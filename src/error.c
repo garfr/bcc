@@ -3,17 +3,17 @@
 // Part of BCC, which is MIT licensed
 // See https//opensource.org/licenses/MIT
 //
-//===----------------------------------------------------------------------===/
+//===----------------------------- About ----------------------------------===/
 //
 // This file provides functions to add to a global error list, which will then
 // be printed when the compiler can no longer continue
 //
-//===----------------------------------------------------------------------===/
+//===------------------------------ Todo ----------------------------------===/
 //
-// TODO: Better multiline errors,
-// Give a specific variant in a variant enum to an error,
-// rather than just having the code raising the error dynamically allocate a
-// string every time.
+// * Better multiline errors
+// * Give a specific variant in a variant enum to an error
+//   rather than just having the code raising the error dynamically allocate a
+//   string every time.
 //
 //===----------------------------------------------------------------------===/
 

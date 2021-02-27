@@ -1,14 +1,22 @@
+//===--------------------- lexer.h - Lexer header file --------------------===/
+//
+// Part of BCC, which is MIT licensed
+// See https//opensource.org/licenses/MIT
+//
+//===----------------------------- About ----------------------------------===/
+//
+// Provides types and function prototypes for lexer.h
+//
+//===----------------------------------------------------------------------===/
+
 #pragma once
 
 #include <stddef.h>
-
 #include <utils.h>
-
-/* Public Interface */
 
 enum TokenType {
     /* Keywords */
-    TOK_VAR,
+    TOK_LET,
     TOK_PROC,
     TOK_MUT,
 
@@ -32,6 +40,8 @@ typedef struct {
 
     union {
         Symbol sym;
+        /* Integers are kept symbols until they can be proven to fit into a
+         * certain integer type */
         Symbol intnum;
     };
 
@@ -39,8 +49,16 @@ typedef struct {
 
 void printToken(Token tok);
 
-typedef struct Lexer Lexer;
+enum LexerState { LEX_START, LEX_SYMBOL, LEX_INT };
 
-Lexer *newLexer(const unsigned char *buffer, size_t len);
+typedef struct {
+    const unsigned char *buffer;
+    size_t bufferLen;
+    size_t startIdx;
+    size_t endIdx;
+    enum LexerState state;
+} Lexer;
+
+Lexer newLexer(const unsigned char *buffer, size_t bufferLen);
 Token nextToken(Lexer *lex);
 Token peekToken(Lexer *lex);

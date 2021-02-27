@@ -19,8 +19,11 @@
     size_t len;
 } Symbol;
 
-/* Works like strcmp */
+/* Works the same way strcmp does */
 int compareSymbol(Symbol sym1, Symbol sym2);
+
+/* Compares a Symbol to a null terminated string */
+int compareSymbolStr(Symbol sym, const char *str);
 
 /*
  * A hashtable that hashes from a Symbol to some unspecified value

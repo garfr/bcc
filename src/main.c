@@ -51,9 +51,9 @@ int main(int argc, char *argv[]) {
 
     initErrors(mapped_file, file_stats.st_size, filename);
 
-    Lexer *lex = newLexer(mapped_file, file_stats.st_size);
+    Lexer lex = newLexer(mapped_file, file_stats.st_size);
 
-    AST *ast = parseSource(lex);
+    AST *ast = parseSource(&lex);
 
     if (errorsExist()) {
         printErrors();

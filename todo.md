@@ -26,9 +26,9 @@ The feature should have no glaring limitations within its scope, and should comp
 
 | Filename  | Status                                               |
 |-----------|------------------------------------------------------|
-| error.c   | Decent, needs reording                               |
+| error.c   | Decent comments, code needs improvement              |
 | utils.c   | Decent comments, well organized                      |
-| lexer.c   | Well organized, no comments                          |
+| lexer.c   | Well organized, comments where needed                |
 | parser.c  | Extremely messy, no comments, bad internal structure |
 | tac.c     | Extremely simple, no comments                        |
 | codegen.c | Worst file in the project                            |

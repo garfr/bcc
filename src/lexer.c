@@ -1,3 +1,21 @@
+//===-------------- lexer.c - Tokenizes a source file lazily --------------===/
+//
+// Part of BCC, which is MIT licensed
+// See https//opensource.org/licenses/MIT
+//
+//===----------------------------- About ----------------------------------===/
+//
+// Breaks a file into tokens lazily.
+//
+//===------------------------------ Todo ----------------------------------===/
+//
+// * Support more complex integer syntaxes (eg. negative signs, hexadecimal,
+//   binary, underscores)
+// * Support floats
+// * Possibly impose naming conventions on tokens
+//
+//===----------------------------------------------------------------------===/
+
 #include <ctype.h>
 #include <error.h>
 #include <lexer.h>
@@ -6,32 +24,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SYM_TABLE_INIT_SIZE 8
-#define MIN(a, b) a > b ? b : a
-
-enum LexerState { LEX_START, LEX_SYMBOL, LEX_INT };
-
-struct Lexer {
-    const unsigned char *buffer;
-    size_t bufferLen;
-    size_t startIdx;
-    size_t endIdx;
-    enum LexerState state;
-};
-
-Lexer *newLexer(const unsigned char *buffer, size_t bufferLen) {
-    Lexer *ret = malloc(sizeof(Lexer));
-    ret->buffer = buffer;
-    ret->bufferLen = bufferLen;
-    ret->startIdx = ret->endIdx = 0;
-    ret->state = LEX_START;
+Lexer newLexer(const unsigned char *buffer, size_t bufferLen) {
+    Lexer ret;
+    ret.buffer = buffer;
+    ret.bufferLen = bufferLen;
+    ret.startIdx = ret.endIdx = 0;
+    ret.state = LEX_START;
     return ret;
 }
 
 void printToken(Token tok) {
     switch (tok.type) {
-        case TOK_VAR:
-            printf("TOK_VAR");
+        case TOK_LET:
+            printf("TOK_LET");
             break;
         case TOK_PROC:
             printf("TOK_PROC");
@@ -57,15 +62,12 @@ void printToken(Token tok) {
         case TOK_EOF:
             printf("TOK_EOF");
             break;
-        default:
-            printf("Compiler internal error: Invalid token type to print %d.\n",
-                   tok.type);
-            exit(1);
     }
-
     printf(" %zd-%zd\n", tok.start, tok.end);
 }
 
+/* Generates a token in the location the lexer is in currently, moves the lexer
+ * forward, and resets the lexer to begin tokenizing then next token */
 static Token makeTokenInplace(Lexer *lex, enum TokenType type) {
     Token tok =
         (Token){.start = lex->startIdx, .end = lex->endIdx, .type = type, {}};
@@ -75,18 +77,8 @@ static Token makeTokenInplace(Lexer *lex, enum TokenType type) {
     return tok;
 }
 
-static int compareSymbolStr(Symbol sym, const char *str) {
-    if (sym.len != strlen(str)) {
-        return -1;
-    }
-    size_t length = MIN(sym.len, strlen(str));
-    for (size_t i = 0; i < length && str[i] != '\0'; i++) {
-        if (sym.text[i] != str[i]) {
-            return -1;
-        }
-    }
-    return 0;
-}
+/* Generates a symbol token one character behind where the lexer is currently,
+ * and resets the lexer to begin tokenizing then next token */
 static Token makeSymbolBehind(Lexer *lex) {
     Symbol sym = (Symbol){.text = &lex->buffer[lex->startIdx],
                           .len = lex->endIdx - lex->startIdx};
@@ -94,8 +86,10 @@ static Token makeSymbolBehind(Lexer *lex) {
     Token tok;
     tok.start = lex->startIdx;
     tok.end = lex->endIdx - 1;
-    if (compareSymbolStr(sym, "var") == 0) {
-        tok.type = TOK_VAR;
+    /* Check if it matches any keywords, this can be replaced with a table in
+     * the future */
+    if (compareSymbolStr(sym, "let") == 0) {
+        tok.type = TOK_LET;
     } else if (compareSymbolStr(sym, "proc") == 0) {
         tok.type = TOK_PROC;
     } else if (compareSymbolStr(sym, "mut") == 0) {
@@ -113,6 +107,7 @@ static Token makeSymbolBehind(Lexer *lex) {
     return tok;
 }
 
+/* Works the same as makeSymbolBehind but with integers */
 static Token makeIntBehind(Lexer *lex) {
     Symbol sym = (Symbol){.text = &lex->buffer[lex->startIdx],
                           .len = lex->endIdx - lex->startIdx};
@@ -130,6 +125,7 @@ static Token makeIntBehind(Lexer *lex) {
     return tok;
 }
 
+/* Big and messy but works well and is actually reasonably readable */
 Token nextToken(Lexer *lex) {
     for (;;) {
         switch (lex->state) {

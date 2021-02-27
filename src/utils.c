@@ -3,15 +3,15 @@
 // Part of BCC, which is MIT licensed
 // See https//opensource.org/licenses/MIT
 //
-//===----------------------------------------------------------------------===/
+//===----------------------------- About ----------------------------------===/
 //
 // This file provides several helper data structures and functions, including a
 // generic hashtbl, vector, and a general purpose Symbol type
 //
-//===----------------------------------------------------------------------===/
+//===------------------------------ Todo ----------------------------------===/
 //
-// TODO: Make the hashtable completely generic and provide type safe wrappers
-// Provide type safe wrappers for the vector implementation
+// * Make the hashtable completely generic and provide type safe wrappers
+// * Provide type safe wrappers for the vector implementation
 //
 //===----------------------------------------------------------------------===/
 
@@ -61,6 +61,21 @@ int compareSymbol(Symbol sym1, Symbol sym2) {
     return strncmp(castSym1, castSym2, length);
 }
 
+/* Compares a Symbol to a null terminated string */
+int compareSymbolStr(Symbol sym, const char *str) {
+    if (sym.len != strlen(str)) {
+        return -1;
+    }
+    size_t stringLength = strlen(str);
+    /* Smallest size of the two, to make sure a buffer overrun doesn't occur */
+    size_t length = sym.len < stringLength ? sym.len : stringLength;
+    for (size_t i = 0; i < length && str[i] != '\0'; i++) {
+        if (sym.text[i] != str[i]) {
+            return -1;
+        }
+    }
+    return 0;
+}
 /* ------------------------------ Hashtbl ---------------------------------- */
 
 Hashtbl *newHashtbl(size_t initBuckets) {
