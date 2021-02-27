@@ -76,6 +76,7 @@ int compareSymbolStr(Symbol sym, const char *str) {
     }
     return 0;
 }
+
 /* ------------------------------ Hashtbl ---------------------------------- */
 
 Hashtbl *newHashtbl(size_t initBuckets) {
@@ -208,4 +209,17 @@ bool pushVector(Vector *vec, void *data) {
 /* Returns a pointer to the value indexed */
 void *indexVector(Vector *vec, size_t index) {
     return &((char *)vec->data)[index * vec->itemSize];
+}
+
+/* ------------------------------ Scope ------------------------------------ */
+
+/* Searches through a scope to find an entry for a symbol */
+HashEntry *findInScope(Scope *scope, Symbol sym) {
+    for (; scope != NULL; scope = scope->upScope) {
+        HashEntry *entry = findHashtbl(scope->vars, sym);
+        if (entry != NULL) {
+            return entry;
+        }
+    }
+    return NULL;
 }

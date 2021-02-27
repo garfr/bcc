@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
         printErrors();
     }
 
-    generateCode(tac, ast->symTable, stdout);
+    generateCode(tac, ast->globalScope->vars, stdout);
 
     if (errorsExist()) {
         printErrors();

@@ -1,3 +1,15 @@
+//===------------------ parser.h - Parser header file --------------------===//
+//
+// Part of BCC, which is MIT licensed
+// See https//opensource.org/licenses/MIT
+//
+//===----------------------------- About ---------------------------------===//
+//
+// Provides types for the abstract syntax tree and function protoypes for
+// parsing.
+//
+//===---------------------------------------------------------------------===//
+
 #pragma once
 
 #include <lexer.h>
@@ -5,26 +17,27 @@
 #include <stdint.h>
 #include <utils.h>
 
-enum TypeType {
-    TYP_SINT,
-    TYP_INTLIT,
-};
+/* -------------------------------- AST ------------------------------------ */
 
+/* A variant enum representing a compound type expression, which will include
+ * arrays, pointers, and user defined records, enums, and tuples later */
 typedef struct Type {
-    enum TypeType type;
+    enum TypeType {
+        TYP_SINT,
+        TYP_INTLIT,
+    } type;
 
     union {
         int64_t intbits;
     };
 } Type;
 
-enum ExprType { EXP_INT, EXP_VAR };
-
+/* A variant enum representing an expression in the AST */
 typedef struct Expr {
     size_t start;
     size_t end;
 
-    enum ExprType type;
+    enum ExprType { EXP_INT, EXP_VAR } type;
 
     Type *typeExpr;
     union {
@@ -33,24 +46,21 @@ typedef struct Expr {
     };
 } Expr;
 
-enum StmtType { STMT_DEC, STMT_DEC_ASSIGN, STMT_ASSIGN };
-
+/* A variant enum representing a single statment in the AST */
 typedef struct Stmt {
     size_t start;
     size_t end;
 
-    enum StmtType type;
+    enum StmtType { STMT_DEC, STMT_DEC_ASSIGN, STMT_ASSIGN } type;
 
     union {
         struct {
             HashEntry *var;
-            /* This will get its own type soon. TODO */
             Type *type;
         } dec;
 
         struct {
             HashEntry *var;
-            /* This will get its own type soon. TODO */
             Type *type;
             Expr *value;
         } dec_assign;
@@ -61,33 +71,17 @@ typedef struct Stmt {
     };
 } Stmt;
 
-typedef struct {
-    Vector *stmts;
-    Hashtbl *symTable;
-} AST;
-
-/* Value of symbols hashed into symbol tables */
+/* The value that the AST symbol table hashes too
+ * This will grow as more information is collected */
 typedef struct {
     Type *type;
 } TypedEntry;
 
-/* upScope is NULL if its global */
-typedef struct Scope {
-    struct Scope *upScope;
-    Hashtbl *vars;
-} Scope;
-
+/* The full abstract syntax tree that currently is just a vector of statments
+ * and a global scope */
 typedef struct {
-    Lexer *lex;
-    Scope *currentScope;
-} Parser;
-
-Parser *newParser(Lexer *lex);
-
-void printExpr(Expr *exp);
-Expr *parseExpr(Parser *parser);
-
-void printStmt(Stmt *stmt);
-Stmt *parseStmt(Parser *parser);
+    Vector *stmts;
+    Scope *globalScope;
+} AST;
 
 AST *parseSource(Lexer *lex);

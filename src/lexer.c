@@ -1,20 +1,20 @@
-//===-------------- lexer.c - Tokenizes a source file lazily --------------===/
+//===------------- lexer.c - Tokenizes a source file lazily --------------===//
 //
 // Part of BCC, which is MIT licensed
 // See https//opensource.org/licenses/MIT
 //
-//===----------------------------- About ----------------------------------===/
+//===----------------------------- About ---------------------------------===//
 //
 // Breaks a file into tokens lazily.
 //
-//===------------------------------ Todo ----------------------------------===/
+//===------------------------------ Todo ---------------------------------===//
 //
 // * Support more complex integer syntaxes (eg. negative signs, hexadecimal,
 //   binary, underscores)
 // * Support floats
 // * Possibly impose naming conventions on tokens
 //
-//===----------------------------------------------------------------------===/
+//===---------------------------------------------------------------------===//
 
 #include <ctype.h>
 #include <error.h>

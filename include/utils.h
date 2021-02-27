@@ -14,6 +14,13 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+/* ------------------------------ Helpers ---------------------------------- */
+
+/* Sprintf but it mallocs memory */
+char *msprintf(const char *format, ...);
+
+/* ------------------------------ Symbol ----------------------------------- */
+
 /* A fat pointer to a location in the file being compiled */ typedef struct {
     const unsigned char *text;
     size_t len;
@@ -24,6 +31,8 @@ int compareSymbol(Symbol sym1, Symbol sym2);
 
 /* Compares a Symbol to a null terminated string */
 int compareSymbolStr(Symbol sym, const char *str);
+
+/* ------------------------------ Hashtbl ---------------------------------- */
 
 /*
  * A hashtable that hashes from a Symbol to some unspecified value
@@ -53,6 +62,8 @@ HashEntry *findHashtbl(Hashtbl *tbl, Symbol sym);
 /* Returns NULL if the entry is already found */
 HashEntry *insertHashtbl(Hashtbl *tbl, Symbol sym, void *data);
 
+/* ------------------------------ Vector ----------------------------------- */
+
 /*
  * A completely generic resizeable array which actually holds the data passed to
  * it may give this some typesafe wrappers in the future
@@ -70,5 +81,13 @@ Vector *newVector(size_t itemSize, size_t initialSize);
 bool pushVector(Vector *vec, void *data);
 void *indexVector(Vector *vec, size_t index);
 
-/* Sprintf but it mallocs memory */
-char *msprintf(const char *format, ...);
+/* ------------------------------ Scope ------------------------------------ */
+
+/* A lexical scope */
+typedef struct Scope {
+    struct Scope *upScope;
+    Hashtbl *vars;
+} Scope;
+
+/* Searches through a scope to find an entry for a symbol */
+HashEntry *findInScope(Scope *scope, Symbol sym);
