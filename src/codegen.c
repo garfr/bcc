@@ -1,3 +1,26 @@
+//===------------- codegen.c - Generates code from the TAC ---------------===//
+//
+// Part of BCC, which is MIT licensed
+// See https//opensource.org/licenses/MIT
+//
+//===----------------------------- About ---------------------------------===//
+//
+// Taking as input the TAC address code from tac.h, this produces an output in
+// NASM format assembly. This code generation here is extremely primitive, with
+// basic things like register allocation and instruction selection not
+// implemented to any meaningful degree.
+//
+// For now it generates code for the NASM assembler, but a builtin assembler
+// would probably be a good idea in the future.
+//
+//===------------------------------ Todo ---------------------------------===//
+//
+// * A proper register allocation process
+// * A proper instruction selection process
+// * More passes for more flexibility
+//
+//===---------------------------------------------------------------------===//
+
 #include <codegen.h>
 #include <error.h>
 #include <parser.h>
@@ -6,15 +29,17 @@
 #include <stdlib.h>
 #include <utils.h>
 
-/* This is an extremely basic code generator.
- * It performs no optimizations, and allocates and assigns registers
- * in a very crude way.
- * It generates code x86_64 in the NASM format, utilizing no predefined macros.
- * One day this will be replaced with a homegrown assembler builtin to the
- * compiler */
+/* The context for the primitive register allocator */
+typedef struct {
+    bool regs[9];
+    Hashtbl* newSyms;
+    size_t currOffset;
+} RegAlloc;
 
-/* Utilize the constant strings instead of stack allocating a new for each
- * function */
+/*
+ * All the scratch registers allowed in the System V ABI, each index is the same
+ * register across arrays
+ */
 const char* reg64[] = {"rax", "rdi", "rsi", "rdx", "rcx",
                        "r8",  "r9",  "r10", "r11"};
 const char* reg32[] = {"eax", "edi", "esi",  "edx", "ecx",
@@ -40,6 +65,8 @@ size_t calculateSize(Type* type) {
     return 0;
 }
 
+/* Given a register and a size in bytes, this returns the correct name of the
+ * register */
 const char* getRegister(enum Register reg, size_t bytes) {
     switch (bytes) {
         case 1:
@@ -59,12 +86,6 @@ const char* getRegister(enum Register reg, size_t bytes) {
 }
 
 typedef struct {
-    bool regs[9];
-    Hashtbl* newSyms;
-    size_t currOffset;
-} RegAlloc;
-
-typedef struct {
     enum {
         LOC_REG,
         LOC_STACK,
@@ -77,6 +98,8 @@ typedef struct {
 
 } ValueLocation;
 
+/* The values that symbols will be hashed too, including more information than
+ * in the AST table */
 typedef struct {
     Type* type;
     ValueLocation loc;
@@ -90,8 +113,11 @@ typedef struct {
  */
 HashEntry* allocateRegister(HashEntry* entry, RegAlloc* alloc) {
     for (int i = 0; i < 9; i++) {
+        /* Is this register available? */
         if (alloc->regs[i]) {
             alloc->regs[i] = false;
+
+            /* Make new entry in the codegenerator symbol table */
             CodegenEntry* newData = malloc(sizeof(CodegenEntry));
             newData->type = ((TypedEntry*)entry->data)->type;
             newData->loc =
@@ -99,6 +125,8 @@ HashEntry* allocateRegister(HashEntry* entry, RegAlloc* alloc) {
             return insertHashtbl(alloc->newSyms, entry->id, newData);
         }
     }
+
+    /* No registers available, so stick it on the stack */
     CodegenEntry* newData = malloc(sizeof(CodegenEntry));
     newData->type = ((TypedEntry*)entry->data)->type;
     newData->loc =
@@ -109,9 +137,11 @@ HashEntry* allocateRegister(HashEntry* entry, RegAlloc* alloc) {
     return insertHashtbl(alloc->newSyms, entry->id, newData);
 }
 
+/* This is horrible and only works for something like copy or arithmetic */
 void generateTACInst(RegAlloc* alloc, TACInst* inst, FILE* output) {
     const char* args[3];
     size_t firstSize;
+    /* Converts all the addresses to a string */
     for (int i = 0; i < 3; i++) {
         switch (inst->args[i].type) {
             case ADDR_VAR: {
@@ -152,6 +182,7 @@ void generateTACInst(RegAlloc* alloc, TACInst* inst, FILE* output) {
     switch (inst->op) {
         char* sizeSpec;
         case OP_COPY: {
+            /* Must specify the size of the operation */
             switch (firstSize) {
                 case 1:
                     sizeSpec = "BYTE";
@@ -175,24 +206,25 @@ void generateTACInst(RegAlloc* alloc, TACInst* inst, FILE* output) {
     }
 }
 
-RegAlloc* newRegisterAllocator(Hashtbl* symTable) {
-    RegAlloc* ret = malloc(sizeof(RegAlloc));
+RegAlloc newRegisterAllocator(Hashtbl* symTable) {
+    RegAlloc ret;
     for (int i = 0; i < 9; i++) {
-        ret->regs[i] = true;
+        ret.regs[i] = true;
     }
-    ret->newSyms = newHashtbl(symTable->numBuckets);
+    ret.newSyms = newHashtbl(symTable->numBuckets);
+    ret.currOffset = 0;
     return ret;
 }
 
 void generateCode(TAC* tac, Hashtbl* symTable, FILE* output) {
     fprintf(output, "global main\n\nmain:\n\tpush rbp\n\tmov rbp, rsp\n");
 
-    RegAlloc* registers = newRegisterAllocator(symTable);
+    RegAlloc registers = newRegisterAllocator(symTable);
 
     for (size_t i = 0; i < tac->codes->numItems; i++) {
         fprintf(output, "\t");
         TACInst* inst = *((TACInst**)indexVector(tac->codes, i));
-        generateTACInst(registers, inst, output);
+        generateTACInst(&registers, inst, output);
     }
     fprintf(output, "\tmov eax, 0\n\tpop rbp\n\tret\n");
 }

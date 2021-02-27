@@ -1,3 +1,14 @@
+//===----------- tac.h - The Three Address Code Header -------------===//
+//
+// Part of BCC, which is MIT licensed
+// See https//opensource.org/licenses/MIT
+//
+//===----------------------------- About ---------------------------------===//
+//
+// The header file for the tac.c
+//
+//===---------------------------------------------------------------------===//
+
 #pragma once
 
 #include <parser.h>
@@ -9,6 +20,7 @@ typedef enum {
     OP_COPY,
 } TACOp;
 
+/* A variant enum representing a single address in the TAC */
 typedef struct {
     enum {
         ADDR_VAR,
@@ -24,10 +36,7 @@ typedef struct {
     };
 } TACAddr;
 
-/* One isntruction in the three address code
- * Represented as quadruples, although this may change to indirect triples later
- */
-
+/* One isntruction in the three address code, represented as quadruples */
 typedef struct {
     TACOp op;
     TACAddr args[3];
@@ -37,5 +46,6 @@ typedef struct {
     Vector* codes;
 } TAC;
 
-TAC* convertAST(AST* ast);
+TAC convertAST(AST* ast);
+
 void printTAC(TAC* tac);

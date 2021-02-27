@@ -1,3 +1,28 @@
+//===--------------- main.c - The home of BCC -------------------===//
+//
+// Part of BCC, which is MIT licensed
+// See https//opensource.org/licenses/MIT
+//
+//===----------------------------- About ---------------------------------===//
+//
+// BCC is organized like many other compilers.
+// First, a source file is tokenized and parsed into an AST by the parser.
+// Then, after semantic analysis ensuring the structure of the program, the AST
+// is translated into a lower level IR, in this case a three address code.
+// Finally, this IR is analyzed is translated into the output of the compiler,
+// assembly in the Intel format, designed for NASM
+//
+//===------------------------------ Todo ---------------------------------===//
+//
+// Local to this file:
+//
+// * Improve IO
+// * Better error messages
+//
+// For larger scale "todos" see todo.md in the main directory of the project
+//
+//===---------------------------------------------------------------------===//
+
 #include <codegen.h>
 #include <errno.h>
 #include <error.h>
@@ -19,6 +44,7 @@ int main(int argc, char *argv[]) {
     }
     const char *filename = argv[1];
 
+    /* mmap the file open */
     int fd = open(filename, O_RDONLY);
 
     if (fd < 0) {
@@ -59,13 +85,13 @@ int main(int argc, char *argv[]) {
         printErrors();
     }
 
-    TAC *tac = convertAST(ast);
+    TAC tac = convertAST(ast);
 
     if (errorsExist()) {
         printErrors();
     }
 
-    generateCode(tac, ast->globalScope->vars, stdout);
+    generateCode(&tac, ast->globalScope->vars, stdout);
 
     if (errorsExist()) {
         printErrors();

@@ -1,11 +1,29 @@
+//===--------------- tac.c - The Three Address Code IR -------------------===//
+//
+// Part of BCC, which is MIT licensed
+// See https//opensource.org/licenses/MIT
+//
+//===----------------------------- About ---------------------------------===//
+//
+// Taking a highlevel IR (the AST) as input, this outputs a representation of
+// the program in the form of a three address code (TAC). It expects that any
+// semantic or syntactical errors were located and reported during parser /
+// semantic analysis on the higher level IR.
+//
+// The TAC is represented as quadruples, where along with a TACOP enum
+// specifying the operation, each instruction has 3 address, which the 3rd being
+// the output location of the operation
+//
+//===---------------------------------------------------------------------===//
+
 #include <parser.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <tac.h>
 
-static TAC* newTAC() {
-    TAC* ret = malloc(sizeof(TAC));
-    ret->codes = newVector(sizeof(TACInst*), 0);
+static TAC newTAC() {
+    TAC ret;
+    ret.codes = newVector(sizeof(TACInst*), 0);
     return ret;
 }
 
@@ -50,6 +68,7 @@ void printTAC(TAC* tac) {
     }
 }
 
+/* Adds a copy instruction to the code */
 void addCopy(TACAddr dest, TACAddr value, TAC* tac) {
     TACInst* code = malloc(sizeof(TACInst));
     code->op = OP_COPY;
@@ -59,6 +78,8 @@ void addCopy(TACAddr dest, TACAddr value, TAC* tac) {
     pushVector(tac->codes, &code);
 }
 
+/* Very simpler conversion algorithm, will become more complex with compound
+ * expressions, arrays, control structures, etc. */
 void convertStmt(TAC* tac, Stmt* stmt) {
     switch (stmt->type) {
         case STMT_DEC:
@@ -104,10 +125,10 @@ void convertStmt(TAC* tac, Stmt* stmt) {
     }
 }
 
-TAC* convertAST(AST* ast) {
-    TAC* tac = newTAC();
+TAC convertAST(AST* ast) {
+    TAC tac = newTAC();
     for (size_t i = 0; i < ast->stmts->numItems; i++) {
-        convertStmt(tac, *((Stmt**)indexVector(ast->stmts, i)));
+        convertStmt(&tac, *((Stmt**)indexVector(ast->stmts, i)));
     }
     return tac;
 }
