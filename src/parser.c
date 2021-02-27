@@ -38,14 +38,10 @@ Expr *exprFromToken(Token tok, enum ExprType type) {
 void printExpr(Expr *exp) {
     switch (exp->type) {
         case EXP_INT:
-            printf("EXP_INT: '");
-            printSymbol(exp->intlit);
-            printf("'");
+            printf("EXP_INT: '%.*s'", (int)exp->intlit.len, exp->intlit.text);
             break;
         case EXP_VAR:
-            printf("EXP_VAR: '");
-            printSymbol(exp->var->id);
-            printf("'");
+            printf("EXP_VAR: '%.*s'", (int)exp->var->id.len, exp->var->id.text);
             break;
     }
 
@@ -105,9 +101,9 @@ Type *parseType(Parser *parser) {
 
     Token tok = nextToken(parser->lex);
     if (tok.type != TOK_SYM) {
-        queueError(dynamicSprintf("Unexpected token, expected type to be a "
-                                  "single symbol, arrays "
-                                  "and pointers are not supported"),
+        queueError(msprintf("Unexpected token, expected type to be a "
+                            "single symbol, arrays "
+                            "and pointers are not supported"),
                    tok.start, tok.end);
         tok = continueUntil(parser->lex, TOK_SYM_BITS);
     }
@@ -120,7 +116,7 @@ Type *parseType(Parser *parser) {
             return ret;
         default:
             queueError(
-                dynamicSprintf(
+                msprintf(
                     "Expected type to be a symbol with first character 's' "
                     "and ending with a number, not '%.*s'",
                     tok.sym.len, tok.sym.text),
@@ -148,9 +144,9 @@ Expr *parseExpr(Parser *parser) {
 
             HashEntry *entry = findInScope(parser, tok.sym);
             if (entry == NULL) {
-                queueError(dynamicSprintf("Cannot find variable: '%.*s' in any "
-                                          "scope. Must be undeclared",
-                                          tok.sym.len, (char *)tok.sym.text),
+                queueError(msprintf("Cannot find variable: '%.*s' in any "
+                                    "scope. Must be undeclared",
+                                    tok.sym.len, (char *)tok.sym.text),
                            tok.start, tok.end);
                 /* Must fail */
                 printErrors();
@@ -159,10 +155,9 @@ Expr *parseExpr(Parser *parser) {
             ret->typeExpr = ((TypedEntry *)entry->data)->type;
             return ret;
         default:
-            queueError(
-                dynamicSprintf("Expected an integer or variable name for "
-                               "expressions, not another token"),
-                tok.start, tok.end);
+            queueError(msprintf("Expected an integer or variable name for "
+                                "expressions, not another token"),
+                       tok.start, tok.end);
             printErrors();
             /* This never gets called */ exit(1);
     }
@@ -171,9 +166,9 @@ Expr *parseExpr(Parser *parser) {
 char *stringOfType(Type *type) {
     switch (type->type) {
         case TYP_SINT:
-            return dynamicSprintf("TYP_SINT: 's%ld'", type->intbits);
+            return msprintf("TYP_SINT: 's%ld'", type->intbits);
         case TYP_INTLIT:
-            return dynamicSprintf("TYP_INTLIT");
+            return msprintf("TYP_INTLIT");
     }
     return NULL;
 }
@@ -190,25 +185,23 @@ void printType(Type *type) {
 void printStmt(Stmt *stmt) {
     switch (stmt->type) {
         case STMT_DEC:
-            printf("STMT_DEC: '");
-            printSymbol(stmt->dec.var->id);
-            printf("' : '");
+            printf("STMT_DEC: '%.*s' : ", (int)stmt->dec.var->id.len,
+                   stmt->dec.var->id.text);
             printType(stmt->dec.type);
             printf("'");
             break;
         case STMT_DEC_ASSIGN:
-            printf("STMT_DEC_ASSIGN: '");
-            printSymbol(stmt->dec_assign.var->id);
-            printf("' : '");
+            printf(
+                "STMT_DEC_ASSIGN: '%.*s' : ", (int)stmt->dec_assign.var->id.len,
+                stmt->dec_assign.var->id.text);
             printType(stmt->dec_assign.type);
             printf("' = (");
             printExpr(stmt->dec_assign.value);
             printf(")");
             break;
         case STMT_ASSIGN:
-            printf("STMT_ASSIGN: '");
-            printSymbol(stmt->assign.var->id);
-            printf("' = (");
+            printf("STMT_ASSIGN: '%.*s' = (", (int)stmt->assign.var->id.len,
+                   stmt->assign.var->id.text);
             printExpr(stmt->assign.value);
             printf(")");
             break;
@@ -250,7 +243,7 @@ Stmt *parseDec(Parser *parser, Token varTok) {
     Stmt *retStmt;
     Token symTok = nextToken(parser->lex);
     if (symTok.type != TOK_SYM) {
-        queueError(dynamicSprintf("Expected variable name after keyword 'var'"),
+        queueError(msprintf("Expected variable name after keyword 'var'"),
                    symTok.start, symTok.end);
         symTok = continueUntil(parser->lex, TOK_SYM_BITS);
     }
@@ -258,8 +251,8 @@ Stmt *parseDec(Parser *parser, Token varTok) {
     /* Expect a colon */
     Token colonTok = nextToken(parser->lex);
     if (colonTok.type != TOK_COLON) {
-        queueError(dynamicSprintf("Expected ':' after variable name and before "
-                                  "variable type in variable declaration"),
+        queueError(msprintf("Expected ':' after variable name and before "
+                            "variable type in variable declaration"),
                    colonTok.start, colonTok.end);
         colonTok = continueUntil(parser->lex, TOK_COLON_BITS);
     }
@@ -269,8 +262,8 @@ Stmt *parseDec(Parser *parser, Token varTok) {
 
     if (semicolonOrEqual.type != TOK_SEMICOLON &&
         semicolonOrEqual.type != TOK_EQUAL) {
-        queueError(dynamicSprintf("Expected '=' or ';' after declaring the "
-                                  "type and name of a variable"),
+        queueError(msprintf("Expected '=' or ';' after declaring the "
+                            "type and name of a variable"),
                    semicolonOrEqual.start, semicolonOrEqual.end);
         semicolonOrEqual =
             continueUntil(parser->lex, TOK_SEMICOLON_BITS | TOK_EQUAL_BITS);
@@ -282,11 +275,10 @@ Stmt *parseDec(Parser *parser, Token varTok) {
 
             HashEntry *entry = addToScope(parser, symTok.sym, type);
             if (entry == NULL) {
-                queueError(
-                    dynamicSprintf("Cannot redeclare variable: '%.*s' in "
-                                   "the same scope",
-                                   symTok.sym.len, (char *)symTok.sym.text),
-                    retStmt->start, retStmt->end);
+                queueError(msprintf("Cannot redeclare variable: '%.*s' in "
+                                    "the same scope",
+                                    symTok.sym.len, (char *)symTok.sym.text),
+                           retStmt->start, retStmt->end);
                 /* Must fail */
                 printErrors();
             }
@@ -301,16 +293,16 @@ Stmt *parseDec(Parser *parser, Token varTok) {
             /* TODO: Do some sanity checks on the size of the integer */
             if (compareTypes(exprType, varType) == false &&
                 (exprType->type != TYP_INTLIT || varType->type != TYP_SINT)) {
-                queueError(dynamicSprintf("Type of '%s' cannot be casted to "
-                                          "declared type of '%s'",
-                                          stringOfType(exp->typeExpr),
-                                          stringOfType(type)),
-                           exp->start, exp->end);
+                queueError(
+                    msprintf("Type of '%s' cannot be casted to "
+                             "declared type of '%s'",
+                             stringOfType(exp->typeExpr), stringOfType(type)),
+                    exp->start, exp->end);
             }
 
             Token semicolonTok = nextToken(parser->lex);
             if (semicolonTok.type != TOK_SEMICOLON) {
-                queueError(dynamicSprintf("Expected ';' after expression.\n"),
+                queueError(msprintf("Expected ';' after expression.\n"),
                            semicolonTok.start, semicolonTok.end);
                 printErrors();
                 exit(1);
@@ -321,11 +313,10 @@ Stmt *parseDec(Parser *parser, Token varTok) {
             HashEntry *entry = addToScope(parser, symTok.sym, varType);
             if (entry == NULL) {
                 printf("ERROR COCCURED\n");
-                queueError(
-                    dynamicSprintf("Cannot redeclare variable: '%.*s' in "
-                                   "the same scope",
-                                   symTok.sym.len, (char *)symTok.sym.text),
-                    stmt->start, stmt->end);
+                queueError(msprintf("Cannot redeclare variable: '%.*s' in "
+                                    "the same scope",
+                                    symTok.sym.len, (char *)symTok.sym.text),
+                           stmt->start, stmt->end);
                 /* Must fail */
                 printErrors();
                 exit(1);
@@ -345,26 +336,24 @@ Stmt *parseDec(Parser *parser, Token varTok) {
 Stmt *parseAssign(Parser *parser, Token symTok) {
     Token equalTok = nextToken(parser->lex);
     if (equalTok.type != TOK_EQUAL) {
-        queueError(
-            dynamicSprintf("Expected '=' after variable name in assignment"),
-            equalTok.start, equalTok.end);
-        printErrors();
+        queueError(msprintf("Expected '=' after variable name in assignment"),
+                   equalTok.start, equalTok.end);
+        equalTok = continueUntil(parser->lex, TOK_EQUAL_BITS);
     }
     Expr *value = parseExpr(parser);
 
     Token semiTok = nextToken(parser->lex);
     if (semiTok.type != TOK_SEMICOLON) {
-        queueError(
-            dynamicSprintf("Expected ';' after expression in assignment"),
-            semiTok.start, semiTok.end);
+        queueError(msprintf("Expected ';' after expression in assignment"),
+                   semiTok.start, semiTok.end);
         printErrors();
     }
     Stmt *ret = stmtFromTwoTokens(symTok, semiTok, STMT_ASSIGN);
 
     HashEntry *entry = findInScope(parser, symTok.sym);
     if (entry == NULL) {
-        queueError(dynamicSprintf("Cannot find variable: '%.*s' in scope",
-                                  symTok.sym.len, (char *)symTok.sym.text),
+        queueError(msprintf("Cannot find variable: '%.*s' in scope",
+                            symTok.sym.len, (char *)symTok.sym.text),
                    ret->start, ret->end);
         printErrors();
     }
@@ -374,12 +363,11 @@ Stmt *parseAssign(Parser *parser, Token symTok) {
 
     if (compareTypes(varType, exprType) == false &&
         ((exprType->type != TYP_INTLIT) || ((varType->type != TYP_SINT)))) {
-        queueError(
-            dynamicSprintf("Type of '%s' cannot be casted to "
-                           "declared type of '%s'",
-                           stringOfType(value->typeExpr),
-                           stringOfType(((TypedEntry *)entry->data)->type)),
-            value->start, value->end);
+        queueError(msprintf("Type of '%s' cannot be casted to "
+                            "declared type of '%s'",
+                            stringOfType(value->typeExpr),
+                            stringOfType(((TypedEntry *)entry->data)->type)),
+                   value->start, value->end);
     }
     ret->assign.var = entry;
     ret->assign.value = value;
@@ -390,9 +378,8 @@ Stmt *parseStmt(Parser *parser) {
     Token tok = nextToken(parser->lex);
 
     if (tok.type != TOK_VAR && tok.type != TOK_SYM) {
-        queueError(
-            dynamicSprintf("Expeted 'var' or a symbol to begin a statement"),
-            tok.start, tok.end);
+        queueError(msprintf("Expeted 'var' or a symbol to begin a statement"),
+                   tok.start, tok.end);
         tok = continueUntil(parser->lex, TOK_VAR_BITS | TOK_SYM_BITS);
     }
     switch (tok.type) {
@@ -408,21 +395,18 @@ Stmt *parseStmt(Parser *parser) {
 
 AST *parseSource(Lexer *lex) {
     Parser *parser = newParser(lex);
-    size_t currSize = 0;
-    Stmt **buffer = NULL;
+    Vector *stmts = newVector(sizeof(Stmt *), 0);
 
     for (;;) {
         if (peekToken(parser->lex).type == TOK_EOF) {
             break;
         }
         Stmt *stmt = parseStmt(parser);
-        buffer = realloc(buffer, sizeof(Stmt *) * (currSize + 1));
-        buffer[currSize++] = stmt;
+        pushVector(stmts, &stmt);
     }
 
     AST *ret = malloc(sizeof(AST));
-    ret->stmts = buffer;
-    ret->numStmts = currSize;
+    ret->stmts = stmts;
     ret->symTable = parser->currentScope->vars;
     return ret;
 }

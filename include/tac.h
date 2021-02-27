@@ -34,8 +34,7 @@ typedef struct {
 } TACInst;
 
 typedef struct {
-    size_t numCodes;
-    TACInst** codes;  // Buffer of pointers to the codes
+    Vector* codes;
 } TAC;
 
 TAC* convertAST(AST* ast);

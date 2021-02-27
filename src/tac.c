@@ -5,20 +5,17 @@
 
 static TAC* newTAC() {
     TAC* ret = malloc(sizeof(TAC));
-    ret->codes = NULL;
-    ret->numCodes = 0;
+    ret->codes = newVector(sizeof(TACInst*), 0);
     return ret;
 }
 
 void printAddr(TACAddr addr) {
     switch (addr.type) {
         case ADDR_VAR:
-            printf("'");
-            printSymbol(addr.var->id);
-            printf("'");
+            printf("'%.*s'", (int)addr.var->id.len, addr.var->id.text);
             break;
         case ADDR_INTLIT:
-            printSymbol(addr.intlit);
+            printf("'%.*s'", (int)addr.intlit.len, addr.intlit.text);
             break;
         case ADDR_TEMP:
             printf("(temp: %.*s)", (int)addr.temp.len, addr.temp.text + 1);
@@ -47,15 +44,10 @@ void printInst(TACInst* inst) {
 }
 
 void printTAC(TAC* tac) {
-    for (size_t i = 0; i < tac->numCodes; i++) {
-        printInst(tac->codes[i]);
+    for (size_t i = 0; i < tac->codes->numItems; i++) {
+        printInst(*((TACInst**)indexVector(tac->codes, i)));
         printf("\n");
     }
-}
-
-static void addCode(TACInst* code, TAC* tac) {
-    tac->codes = realloc(tac->codes, sizeof(TACInst) * (tac->numCodes + 1));
-    tac->codes[tac->numCodes++] = code;
 }
 
 void addCopy(TACAddr dest, TACAddr value, TAC* tac) {
@@ -64,7 +56,7 @@ void addCopy(TACAddr dest, TACAddr value, TAC* tac) {
     code->args[0] = value;
     code->args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
     code->args[2] = dest;
-    addCode(code, tac);
+    pushVector(tac->codes, &code);
 }
 
 void convertStmt(TAC* tac, Stmt* stmt) {
@@ -114,8 +106,8 @@ void convertStmt(TAC* tac, Stmt* stmt) {
 
 TAC* convertAST(AST* ast) {
     TAC* tac = newTAC();
-    for (size_t i = 0; i < ast->numStmts; i++) {
-        convertStmt(tac, ast->stmts[i]);
+    for (size_t i = 0; i < ast->stmts->numItems; i++) {
+        convertStmt(tac, *((Stmt**)indexVector(ast->stmts, i)));
     }
     return tac;
 }

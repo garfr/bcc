@@ -1,39 +1,63 @@
+//===-------------- error.c - Error formatting and printing ---------------===/
+//
+// Part of BCC, which is MIT licensed
+// See https//opensource.org/licenses/MIT
+//
+//===----------------------------------------------------------------------===/
+//
+// This file provides functions to add to a global error list, which will then
+// be printed when the compiler can no longer continue
+//
+//===----------------------------------------------------------------------===/
+//
+// TODO: Better multiline errors,
+// Give a specific variant in a variant enum to an error,
+// rather than just having the code raising the error dynamically allocate a
+// string every time.
+//
+//===----------------------------------------------------------------------===/
+
 #include <error.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <utils.h>
 
 #define BOLDRED "\033[1m\033[31m"
 #define BOLDWHITE "\033[1m\033[37m"
 #define RESET "\033[0m"
 #define RED "\033[31m"
 
-/* Fuck concurrency its global variable time */
+/*
+ * Queuing an error simply appends it to a vector of arrays
+ * Handling the error messages is simply iterating over the list and
+ * printing each one
+ */
 
-Error *errorQueue = NULL;
-const char *bufferName;
-
-const unsigned char *buffer;
-size_t bufferSize;
+struct {
+    Vector *errors;
+    const char *bufferName;
+    const unsigned char *buffer;
+    size_t bufferSize;
+} errorCtx;
 
 void initErrors(const unsigned char *newBuffer, size_t newBufferSize,
                 const char *newBufferName) {
-    buffer = newBuffer;
-    bufferSize = newBufferSize;
-    bufferName = newBufferName;
+    errorCtx.buffer = newBuffer;
+    errorCtx.bufferSize = newBufferSize;
+    errorCtx.bufferName = newBufferName;
+    errorCtx.errors = newVector(sizeof(Error), 0);
 }
 
 void queueError(char *message, size_t start, size_t end) {
-    Error *err = malloc(sizeof(Error));
-    err->message = message;
-    err->start = start;
-    err->end = end;
+    Error err;
+    err.message = message;
+    err.start = start;
+    err.end = end;
 
-    Error *oldErr = errorQueue;
-    errorQueue = err;
-    err->next = oldErr;
+    pushVector(errorCtx.errors, &err);
 }
 
 typedef struct {
@@ -45,6 +69,11 @@ typedef struct {
     size_t column_end;
 } Location;
 
+/*
+ * This is bad and incomplete
+ * It hosts who knows how many bugs
+ * I will fix this.
+ */
 Location calculateLocation(size_t start, size_t end) {
     size_t line = 1;
     size_t column = 1;
@@ -52,7 +81,7 @@ Location calculateLocation(size_t start, size_t end) {
 
     for (i = 0; i < start; i++) {
         column++;
-        if (buffer[i] == '\n') {
+        if (errorCtx.buffer[i] == '\n') {
             line++;
             column = 1;
         }
@@ -61,15 +90,15 @@ Location calculateLocation(size_t start, size_t end) {
     Location ret;
     size_t line_start;
     for (line_start = start; line_start > 0; line_start--) {
-        if (buffer[line_start] == '\n') {
+        if (errorCtx.buffer[line_start] == '\n') {
             break;
         }
     }
     ret.line_start = line;
     ret.line_idx = line_start;
     size_t line_end;
-    for (line_end = start; line_end < bufferSize; line_end++) {
-        if (buffer[line_end] == '\n') {
+    for (line_end = start; line_end < errorCtx.bufferSize; line_end++) {
+        if (errorCtx.buffer[line_end] == '\n') {
             break;
         }
     }
@@ -79,7 +108,7 @@ Location calculateLocation(size_t start, size_t end) {
     ret.column_end = column;
     for (size_t i = start; i < end; i++) {
         ret.column_end++;
-        if (buffer[i] == '\n') {
+        if (errorCtx.buffer[i] == '\n') {
             ret.line_end++;
             ret.column_end = 1;
         }
@@ -87,12 +116,13 @@ Location calculateLocation(size_t start, size_t end) {
     return ret;
 }
 
-/* TODO: Improve error printing. */
+/* This is also weird and bad */
 void printError(Error *err) {
     Location loc = calculateLocation(err->start, err->end);
 
     printf(BOLDWHITE);
-    printf("%s:%zd:%zd: ", bufferName, loc.line_start, loc.column_start);
+    printf("%s:%zd:%zd: ", errorCtx.bufferName, loc.line_start,
+           loc.column_start);
     printf(BOLDRED);
     printf("error: ");
     printf(BOLDWHITE);
@@ -100,7 +130,7 @@ void printError(Error *err) {
     printf(RESET);
     printf("   %zd | ", loc.line_start);
     for (size_t i = loc.line_idx + 1; i < loc.line_idx_end; i++) {
-        putchar(buffer[i]);
+        putchar(errorCtx.buffer[i]);
     }
     printf("\n");
     printf("     | ");
@@ -115,32 +145,12 @@ void printError(Error *err) {
     printf("\n");
 }
 
-void printErrorHelper(Error *err) {
-    if (err->next != NULL) {
-        printErrorHelper(err->next);
-    }
-    printError(err);
-}
-
 void printErrors() {
-    printErrorHelper(errorQueue);
+    for (size_t i = 0; i < errorCtx.errors->numItems; i++) {
+        printError(indexVector(errorCtx.errors, i));
+    }
     exit(1);
 }
 
-char *dynamicSprintf(const char *format, ...) {
-    va_list args;
-    va_start(args, format);
-    va_list args2;
-    va_copy(args2, args);
+bool errorsExist() { return errorCtx.errors->numItems != 0; }
 
-    size_t memNeeded = vsnprintf(NULL, 0, format, args) + 1;
-    char *buffer = malloc(memNeeded * sizeof(char));
-    if (buffer == NULL) {
-        printf("Compiler internal error: Out of memory.\n");
-        exit(1);
-    }
-    vsprintf(buffer, format, args2);
-    return buffer;
-}
-
-bool errorsExist() { return errorQueue != NULL; }

@@ -62,8 +62,7 @@ typedef struct Stmt {
 } Stmt;
 
 typedef struct {
-    Stmt **stmts;
-    size_t numStmts;
+    Vector *stmts;
     Hashtbl *symTable;
 } AST;
 

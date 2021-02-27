@@ -29,44 +29,38 @@ Lexer *newLexer(const unsigned char *buffer, size_t bufferLen) {
 }
 
 void printToken(Token tok) {
-
     switch (tok.type) {
-
-    case TOK_VAR:
-        printf("TOK_VAR");
-        break;
-    case TOK_PROC:
-        printf("TOK_PROC");
-        break;
-    case TOK_MUT:
-        printf("TOK_MUT");
-        break;
-    case TOK_SYM:
-        printf("TOK_SYM: '");
-        printSymbol(tok.sym);
-        printf("'");
-        break;
-    case TOK_INT:
-        printf("TOK_INT: '");
-        printSymbol(tok.intnum);
-        printf("'");
-        break;
-    case TOK_COLON:
-        printf("TOK_COLON");
-        break;
-    case TOK_SEMICOLON:
-        printf("TOK_SEMICOLON");
-        break;
-    case TOK_EQUAL:
-        printf("TOK_EQUAL");
-        break;
-    case TOK_EOF:
-        printf("TOK_EOF");
-        break;
-    default:
-        printf("Compiler internal error: Invalid token type to print %d.\n",
-               tok.type);
-        exit(1);
+        case TOK_VAR:
+            printf("TOK_VAR");
+            break;
+        case TOK_PROC:
+            printf("TOK_PROC");
+            break;
+        case TOK_MUT:
+            printf("TOK_MUT");
+            break;
+        case TOK_SYM:
+            printf("TOK_SYM: '%.*s'", (int)tok.sym.len, tok.sym.text);
+            break;
+        case TOK_INT:
+            printf("TOK_INT: '%.*s'", (int)tok.intnum.len, tok.intnum.text);
+            break;
+        case TOK_COLON:
+            printf("TOK_COLON");
+            break;
+        case TOK_SEMICOLON:
+            printf("TOK_SEMICOLON");
+            break;
+        case TOK_EQUAL:
+            printf("TOK_EQUAL");
+            break;
+        case TOK_EOF:
+            printf("TOK_EOF");
+            break;
+        default:
+            printf("Compiler internal error: Invalid token type to print %d.\n",
+                   tok.type);
+            exit(1);
     }
 
     printf(" %zd-%zd\n", tok.start, tok.end);
@@ -139,67 +133,68 @@ static Token makeIntBehind(Lexer *lex) {
 Token nextToken(Lexer *lex) {
     for (;;) {
         switch (lex->state) {
-        case LEX_START: {
-            if (lex->endIdx >= lex->bufferLen) {
-                return makeTokenInplace(lex, TOK_EOF);
+            case LEX_START: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeTokenInplace(lex, TOK_EOF);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (isalpha(c)) {
+                    lex->state = LEX_SYMBOL;
+                    lex->endIdx++;
+                    continue;
+                }
+                if (isdigit(c)) {
+                    lex->state = LEX_INT;
+                    lex->endIdx++;
+                    continue;
+                }
+                if (isspace(c)) {
+                    lex->endIdx++;
+                    lex->startIdx = lex->endIdx;
+                    continue;
+                }
+                switch (c) {
+                    case ';':
+                        return makeTokenInplace(lex, TOK_SEMICOLON);
+                    case ':':
+                        return makeTokenInplace(lex, TOK_COLON);
+                    case '=':
+                        return makeTokenInplace(lex, TOK_EQUAL);
+                    default: {
+                        char *buffer =
+                            msprintf("Unexpected character: '%c'", c);
+                        queueError(buffer, lex->startIdx, lex->endIdx);
+                        lex->endIdx++;
+                        lex->startIdx = lex->endIdx;
+                        continue;
+                    }
+                }
             }
-            unsigned char c = lex->buffer[lex->endIdx];
-            if (isalpha(c)) {
-                lex->state = LEX_SYMBOL;
-                lex->endIdx++;
-                continue;
+            case LEX_SYMBOL: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeSymbolBehind(lex);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (isalpha(c) || isdigit(c) || c == '_') {
+                    lex->endIdx++;
+                    continue;
+                } else {
+                    return makeSymbolBehind(lex);
+                }
             }
-            if (isdigit(c)) {
-                lex->state = LEX_INT;
-                lex->endIdx++;
-                continue;
-            }
-            if (isspace(c)) {
-                lex->endIdx++;
-                lex->startIdx = lex->endIdx;
-                continue;
-            }
-            switch (c) {
-            case ';':
-                return makeTokenInplace(lex, TOK_SEMICOLON);
-            case ':':
-                return makeTokenInplace(lex, TOK_COLON);
-            case '=':
-                return makeTokenInplace(lex, TOK_EQUAL);
-            default: {
-                char *buffer = dynamicSprintf("Unexpected character: '%c'", c);
-                queueError(buffer, lex->startIdx, lex->endIdx);
-                lex->endIdx++;
-                lex->startIdx = lex->endIdx;
-                continue;
-            }
-            }
-        }
-        case LEX_SYMBOL: {
-            if (lex->endIdx >= lex->bufferLen) {
-                return makeSymbolBehind(lex);
-            }
-            unsigned char c = lex->buffer[lex->endIdx];
-            if (isalpha(c) || isdigit(c) || c == '_') {
-                lex->endIdx++;
-                continue;
-            } else {
-                return makeSymbolBehind(lex);
-            }
-        }
 
-        case LEX_INT: {
-            if (lex->endIdx >= lex->bufferLen) {
-                return makeIntBehind(lex);
+            case LEX_INT: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeIntBehind(lex);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (isdigit(c)) {
+                    lex->endIdx++;
+                    continue;
+                } else {
+                    return makeIntBehind(lex);
+                }
             }
-            unsigned char c = lex->buffer[lex->endIdx];
-            if (isdigit(c)) {
-                lex->endIdx++;
-                continue;
-            } else {
-                return makeIntBehind(lex);
-            }
-        }
         }
     }
 }

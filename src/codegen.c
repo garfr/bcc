@@ -82,7 +82,11 @@ typedef struct {
     ValueLocation loc;
 } CodegenEntry;
 
-/* Allocates a register to the variable and inserts it into the symbol table
+/*
+ * This register allocator simply gives variables and temporariesw in the TAC a
+ * register as it goes through them, and when its out of registers starts
+ * slapping them onto the stack This is very slow and limiting, and certainly
+ * will be changed in later iterations of the code generator
  */
 HashEntry* allocateRegister(HashEntry* entry, RegAlloc* alloc) {
     for (int i = 0; i < 9; i++) {
@@ -129,8 +133,8 @@ void generateTACInst(RegAlloc* alloc, TACInst* inst, FILE* output) {
                                               calculateSize(entry->type));
                         break;
                     case LOC_STACK:
-                        args[i] = dynamicSprintf("[rsp - %zd]",
-                                                 entry->loc.stackOffset);
+                        args[i] =
+                            msprintf("[rsp - %zd]", entry->loc.stackOffset);
                         break;
                 }
             } break;
@@ -138,8 +142,8 @@ void generateTACInst(RegAlloc* alloc, TACInst* inst, FILE* output) {
                 printf("Internal compiler error.\n");
                 exit(1);
             case ADDR_INTLIT:
-                args[i] = dynamicSprintf("%.*s", inst->args[i].intlit.len,
-                                         inst->args[i].intlit.text);
+                args[i] = msprintf("%.*s", inst->args[i].intlit.len,
+                                   inst->args[i].intlit.text);
                 break;
             case ADDR_EMPTY:
                 args[i] = NULL;
@@ -185,10 +189,10 @@ void generateCode(TAC* tac, Hashtbl* symTable, FILE* output) {
 
     RegAlloc* registers = newRegisterAllocator(symTable);
 
-    for (size_t i = 0; i < tac->numCodes; i++) {
+    for (size_t i = 0; i < tac->codes->numItems; i++) {
         fprintf(output, "\t");
-        TACInst* inst = tac->codes[i];
+        TACInst* inst = *((TACInst**)indexVector(tac->codes, i));
         generateTACInst(registers, inst, output);
     }
-    fprintf(output, "\tmov eax, 0\n\tpop rbp\n\tret");
+    fprintf(output, "\tmov eax, 0\n\tpop rbp\n\tret\n");
 }

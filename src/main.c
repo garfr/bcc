@@ -54,7 +54,16 @@ int main(int argc, char *argv[]) {
     Lexer *lex = newLexer(mapped_file, file_stats.st_size);
 
     AST *ast = parseSource(lex);
+
+    if (errorsExist()) {
+        printErrors();
+    }
+
     TAC *tac = convertAST(ast);
+
+    if (errorsExist()) {
+        printErrors();
+    }
 
     generateCode(tac, ast->symTable, stdout);
 
