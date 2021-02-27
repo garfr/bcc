@@ -1,4 +1,3 @@
-CC=gcc
 
 OBJ_DIR=objs
 SRC_DIR=src
