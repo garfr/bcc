@@ -1,4 +1,4 @@
-//===----------- tac.h - The Three Address Code Header -------------===//
+//===-------------- tac.h - The Three Address Code Header ----------------===//
 //
 // Part of BCC, which is MIT licensed
 // See https//opensource.org/licenses/MIT
@@ -48,4 +48,3 @@ typedef struct {
 
 TAC convertAST(AST* ast);
 
-void printTAC(TAC* tac);

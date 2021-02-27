@@ -115,57 +115,6 @@ static bool compareTypes(Type *typ1, Type *typ2) {
     return true;
 }
 
-void printType(Type *type) {
-    switch (type->type) {
-        case TYP_SINT:
-            printf("TYP_SINT: 's%ld'", type->intbits);
-            break;
-        case TYP_INTLIT:
-            printf("TYP_INTLIT");
-    }
-}
-
-void printExpr(Expr *exp) {
-    switch (exp->type) {
-        case EXP_INT:
-            printf("EXP_INT: '%.*s'", (int)exp->intlit.len, exp->intlit.text);
-            break;
-        case EXP_VAR:
-            printf("EXP_VAR: '%.*s'", (int)exp->var->id.len, exp->var->id.text);
-            break;
-    }
-
-    printf(" %zd-%zd", exp->start, exp->end);
-}
-
-void printStmt(Stmt *stmt) {
-    switch (stmt->type) {
-        case STMT_DEC:
-            printf("STMT_DEC: '%.*s' : ", (int)stmt->dec.var->id.len,
-                   stmt->dec.var->id.text);
-            printType(stmt->dec.type);
-            printf("'");
-            break;
-        case STMT_DEC_ASSIGN:
-            printf(
-                "STMT_DEC_ASSIGN: '%.*s' : ", (int)stmt->dec_assign.var->id.len,
-                stmt->dec_assign.var->id.text);
-            printType(stmt->dec_assign.type);
-            printf("' = (");
-            printExpr(stmt->dec_assign.value);
-            printf(")");
-            break;
-        case STMT_ASSIGN:
-            printf("STMT_ASSIGN: '%.*s' = (", (int)stmt->assign.var->id.len,
-                   stmt->assign.var->id.text);
-            printExpr(stmt->assign.value);
-            printf(")");
-            break;
-    }
-
-    printf(" %zd-%zd", stmt->start, stmt->end);
-}
-
 /* This is only needed because the current error handling system does not allow
  * you to just pass a type and have the error printer call printType This means
  * an actual string must be allocated

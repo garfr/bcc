@@ -24,12 +24,12 @@ The feature should have no glaring limitations within its scope, and should comp
 
 ## Source File Status
 
-| Filename  | Status                                               |
-|-----------|------------------------------------------------------|
-| error.c   | Decent comments, code needs improvement              |
-| utils.c   | Decent comments, well organized                      |
-| lexer.c   | Well organized, comments where needed                |
-| parser.c  | Extremely messy, no comments, bad internal structure |
-| tac.c     | Extremely simple, no comments                        |
-| codegen.c | Worst file in the project                            |
+| Filename  | Status                                                      |
+|-----------|-------------------------------------------------------------|
+| error.c   | Decent comments, code needs improvement                     |
+| utils.c   | Decent comments, well organized                             |
+| lexer.c   | Well organized, comments where needed                       |
+| parser.c  | Some comments, difficult to read                            |
+| tac.c     | Very basic, with minimal comments (very few are needed)     |
+| codegen.c | Besides being completely broken, reasonably well organized! |
 

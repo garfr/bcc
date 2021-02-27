@@ -27,47 +27,6 @@ static TAC newTAC() {
     return ret;
 }
 
-void printAddr(TACAddr addr) {
-    switch (addr.type) {
-        case ADDR_VAR:
-            printf("'%.*s'", (int)addr.var->id.len, addr.var->id.text);
-            break;
-        case ADDR_INTLIT:
-            printf("'%.*s'", (int)addr.intlit.len, addr.intlit.text);
-            break;
-        case ADDR_TEMP:
-            printf("(temp: %.*s)", (int)addr.temp.len, addr.temp.text + 1);
-            break;
-        case ADDR_EMPTY:
-            break;
-    }
-}
-
-void printOp(TACOp op) {
-    switch (op) {
-        case OP_COPY:
-            printf("copy");
-    }
-}
-
-void printInst(TACInst* inst) {
-    printOp(inst->op);
-    printf(": [");
-    printAddr(inst->args[0]);
-    printf(", ");
-    printAddr(inst->args[1]);
-    printf(", ");
-    printAddr(inst->args[2]);
-    printf("]");
-}
-
-void printTAC(TAC* tac) {
-    for (size_t i = 0; i < tac->codes->numItems; i++) {
-        printInst(*((TACInst**)indexVector(tac->codes, i)));
-        printf("\n");
-    }
-}
-
 /* Adds a copy instruction to the code */
 void addCopy(TACAddr dest, TACAddr value, TAC* tac) {
     TACInst* code = malloc(sizeof(TACInst));

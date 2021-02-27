@@ -21,7 +21,8 @@ char *msprintf(const char *format, ...);
 
 /* ------------------------------ Symbol ----------------------------------- */
 
-/* A fat pointer to a location in the file being compiled */ typedef struct {
+/* A fat pointer to a location in the file being compiled */
+typedef struct {
     const unsigned char *text;
     size_t len;
 } Symbol;

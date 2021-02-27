@@ -47,8 +47,6 @@ typedef struct {
 
 } Token;
 
-void printToken(Token tok);
-
 enum LexerState { LEX_START, LEX_SYMBOL, LEX_INT };
 
 typedef struct {

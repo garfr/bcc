@@ -33,39 +33,6 @@ Lexer newLexer(const unsigned char *buffer, size_t bufferLen) {
     return ret;
 }
 
-void printToken(Token tok) {
-    switch (tok.type) {
-        case TOK_LET:
-            printf("TOK_LET");
-            break;
-        case TOK_PROC:
-            printf("TOK_PROC");
-            break;
-        case TOK_MUT:
-            printf("TOK_MUT");
-            break;
-        case TOK_SYM:
-            printf("TOK_SYM: '%.*s'", (int)tok.sym.len, tok.sym.text);
-            break;
-        case TOK_INT:
-            printf("TOK_INT: '%.*s'", (int)tok.intnum.len, tok.intnum.text);
-            break;
-        case TOK_COLON:
-            printf("TOK_COLON");
-            break;
-        case TOK_SEMICOLON:
-            printf("TOK_SEMICOLON");
-            break;
-        case TOK_EQUAL:
-            printf("TOK_EQUAL");
-            break;
-        case TOK_EOF:
-            printf("TOK_EOF");
-            break;
-    }
-    printf(" %zd-%zd\n", tok.start, tok.end);
-}
-
 /* Generates a token in the location the lexer is in currently, moves the lexer
  * forward, and resets the lexer to begin tokenizing then next token */
 static Token makeTokenInplace(Lexer *lex, enum TokenType type) {
