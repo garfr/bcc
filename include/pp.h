@@ -20,6 +20,7 @@ void printToken(Token tok);
 void printType(Type *type);
 void printExpr(Expr *exp);
 void printStmt(Stmt *stmt);
+void printAST(AST *ast);
 
 /* tac.h */
 void printAddr(TACAddr addr);

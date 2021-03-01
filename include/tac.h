@@ -18,6 +18,11 @@
 /* Operation */
 typedef enum {
     OP_COPY,
+    OP_ADD,
+    OP_SUB,
+    OP_MUL,
+    OP_DIV,
+
 } TACOp;
 
 /* A variant enum representing a single address in the TAC */
@@ -32,7 +37,10 @@ typedef struct {
     union {
         Symbol intlit;
         HashEntry* var;
-        Symbol temp;
+        struct {
+            size_t num;
+            Type* type;
+        } temp;
     };
 } TACAddr;
 

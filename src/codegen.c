@@ -27,6 +27,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <utils.h>
 
 /* The context for the primitive register allocator */
@@ -55,12 +56,11 @@ enum Register { RAX, RDI, RSI, RDX, RCX, R8, R9, R10, R11 };
 size_t calculateSize(Type* type) {
     switch (type->type) {
         case TYP_SINT:
-            return (type->intbits + (8 / 2)) / 8;
+            return type->intsize;
         case TYP_INTLIT:
-            printf(
-                "Internal compiler error: Cannot calculate the storage size of "
-                "an integer literal.\n");
-            exit(1);
+            /* For now just use 64 bits, later some semantic stuff will happen
+             */
+            return 8;
     }
     return 0;
 }
@@ -111,7 +111,7 @@ typedef struct {
  * slapping them onto the stack This is very slow and limiting, and certainly
  * will be changed in later iterations of the code generator
  */
-HashEntry* allocateRegister(HashEntry* entry, RegAlloc* alloc) {
+HashEntry* allocateRegister(Type* valType, Symbol id, RegAlloc* alloc) {
     for (int i = 0; i < 9; i++) {
         /* Is this register available? */
         if (alloc->regs[i]) {
@@ -119,22 +119,22 @@ HashEntry* allocateRegister(HashEntry* entry, RegAlloc* alloc) {
 
             /* Make new entry in the codegenerator symbol table */
             CodegenEntry* newData = malloc(sizeof(CodegenEntry));
-            newData->type = ((TypedEntry*)entry->data)->type;
+            newData->type = valType;
             newData->loc =
                 (ValueLocation){.type = LOC_REG, .reg = (enum Register)i};
-            return insertHashtbl(alloc->newSyms, entry->id, newData);
+            return insertHashtbl(alloc->newSyms, id, newData);
         }
     }
 
     /* No registers available, so stick it on the stack */
     CodegenEntry* newData = malloc(sizeof(CodegenEntry));
-    newData->type = ((TypedEntry*)entry->data)->type;
+    newData->type = valType;
     newData->loc =
         (ValueLocation){.type = LOC_STACK, .stackOffset = alloc->currOffset};
 
     /* Update the offset */
-    alloc->currOffset += calculateSize(((TypedEntry*)entry->data)->type);
-    return insertHashtbl(alloc->newSyms, entry->id, newData);
+    alloc->currOffset += calculateSize(valType);
+    return insertHashtbl(alloc->newSyms, id, newData);
 }
 
 /* This is horrible and only works for something like copy or arithmetic */
@@ -145,10 +145,13 @@ void generateTACInst(RegAlloc* alloc, TACInst* inst, FILE* output) {
     for (int i = 0; i < 3; i++) {
         switch (inst->args[i].type) {
             case ADDR_VAR: {
+                HashEntry* oldEntry = inst->args[i].var;
                 HashEntry* fullEntry =
-                    findHashtbl(alloc->newSyms, inst->args[i].var->id);
+                    findHashtbl(alloc->newSyms, oldEntry->id);
                 if (fullEntry == NULL) {
-                    fullEntry = allocateRegister(inst->args[i].var, alloc);
+                    fullEntry =
+                        allocateRegister(((TypedEntry*)oldEntry->data)->type,
+                                         oldEntry->id, alloc);
                 }
 
                 CodegenEntry* entry = ((CodegenEntry*)fullEntry->data);
@@ -168,9 +171,36 @@ void generateTACInst(RegAlloc* alloc, TACInst* inst, FILE* output) {
                         break;
                 }
             } break;
-            case ADDR_TEMP:
-                printf("Internal compiler error.\n");
-                exit(1);
+            case ADDR_TEMP: {
+                /* Tempory values will be hashed into the symbol table with * as
+                 * a prefix, this is hacky: sorry. */
+                char* str = msprintf("*%d\n", inst->args[i].temp.num);
+                Symbol sym =
+                    (Symbol){.text = (unsigned char*)str, .len = strlen(str)};
+
+                HashEntry* fullEntry = findHashtbl(alloc->newSyms, sym);
+                if (fullEntry == NULL) {
+                    fullEntry =
+                        allocateRegister(inst->args[i].temp.type, sym, alloc);
+                }
+
+                CodegenEntry* entry = ((CodegenEntry*)fullEntry->data);
+
+                if (i == 2) {
+                    firstSize = calculateSize(inst->args[i].temp.type);
+                }
+
+                switch (entry->loc.type) {
+                    case LOC_REG:
+                        args[i] = getRegister(entry->loc.reg,
+                                              calculateSize(entry->type));
+                        break;
+                    case LOC_STACK:
+                        args[i] =
+                            msprintf("[rsp - %zd]", entry->loc.stackOffset);
+                        break;
+                }
+            } break;
             case ADDR_INTLIT:
                 args[i] = msprintf("%.*s", inst->args[i].intlit.len,
                                    inst->args[i].intlit.text);
@@ -179,30 +209,50 @@ void generateTACInst(RegAlloc* alloc, TACInst* inst, FILE* output) {
                 args[i] = NULL;
         }
     }
+    char* sizeSpec;
+    switch (firstSize) {
+        case 1:
+            sizeSpec = "BYTE";
+            break;
+        case 2:
+            sizeSpec = "WORD";
+            break;
+        case 4:
+            sizeSpec = "DWORD";
+            break;
+        case 8:
+            sizeSpec = "QWORD";
+            break;
+        default:
+            printf("Internal compiler error %ld.\n", firstSize);
+            exit(1);
+    }
     switch (inst->op) {
-        char* sizeSpec;
         case OP_COPY: {
             /* Must specify the size of the operation */
-            switch (firstSize) {
-                case 1:
-                    sizeSpec = "BYTE";
-                    break;
-                case 2:
-                    sizeSpec = "WORD";
-                    break;
-                case 4:
-                    sizeSpec = "DWORD";
-                    break;
-                case 8:
-                    sizeSpec = "QWORD";
-                    break;
-                default:
-                    printf("Internal compiler error %ld.\n", firstSize);
-                    exit(1);
-            }
 
             fprintf(output, "mov %s %s, %s\n", sizeSpec, args[2], args[0]);
+        } break;
+        case OP_ADD: {
+            /*
+             * Given the tac form "r = a + b" restructure that into:
+             * "r = a"
+             * "r += b"
+             * Given that the add operation in x86 only takes two parameters
+             */
+
+            fprintf(output, "mov %s %s, %s\n\t", sizeSpec, args[2], args[0]);
+            fprintf(output, "add %s, %s\n", args[2], args[1]);
+            break;
         }
+        case OP_SUB: {
+            fprintf(output, "mov %s %s, %s\n\t", sizeSpec, args[2], args[0]);
+            fprintf(output, "sub %s, %s\n", args[2], args[1]);
+            break;
+        }
+        default:
+            printf("Internal compiler error: cannot do mult or div.\n");
+            exit(1);
     }
 }
 
@@ -217,7 +267,9 @@ RegAlloc newRegisterAllocator(Hashtbl* symTable) {
 }
 
 void generateCode(TAC* tac, Hashtbl* symTable, FILE* output) {
-    fprintf(output, "global main\n\nmain:\n\tpush rbp\n\tmov rbp, rsp\n");
+    fprintf(output,
+            "global main\n\nmain:\n\t; added by compiler\n\tpush rbp\n\tmov "
+            "rbp, rsp\n\t; real code\n");
 
     RegAlloc registers = newRegisterAllocator(symTable);
 
@@ -226,5 +278,6 @@ void generateCode(TAC* tac, Hashtbl* symTable, FILE* output) {
         TACInst* inst = *((TACInst**)indexVector(tac->codes, i));
         generateTACInst(&registers, inst, output);
     }
-    fprintf(output, "\tmov eax, 0\n\tpop rbp\n\tret\n");
+
+    fprintf(output, "\t; added by compiler\n\tmov eax, 0\n\tpop rbp\n\tret\n");
 }

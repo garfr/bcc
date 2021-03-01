@@ -28,7 +28,8 @@ typedef struct Type {
     } type;
 
     union {
-        int64_t intbits;
+        /* Size of the integer in bytes, must be a power of 2 */
+        int64_t intsize;
     };
 } Type;
 
@@ -37,12 +38,18 @@ typedef struct Expr {
     size_t start;
     size_t end;
 
-    enum ExprType { EXP_INT, EXP_VAR } type;
+    enum ExprType { EXP_INT, EXP_VAR, EXP_BINOP } type;
 
     Type *typeExpr;
     union {
         HashEntry *var;
         Symbol intlit;
+
+        struct {
+            struct Expr *exp1;
+            struct Expr *exp2;
+            enum { BINOP_ADD, BINOP_SUB, BINOP_MULT, BINOP_DIV } op;
+        } binop;
     };
 } Expr;
 
@@ -77,8 +84,8 @@ typedef struct {
     Type *type;
 } TypedEntry;
 
-/* The full abstract syntax tree that currently is just a vector of statments
- * and a global scope */
+/* The full abstract syntax tree that currently is just a vector of
+ * statments and a global scope */
 typedef struct {
     Vector *stmts;
     Scope *globalScope;

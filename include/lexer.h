@@ -28,6 +28,10 @@ enum TokenType {
     TOK_COLON,
     TOK_SEMICOLON,
     TOK_EQUAL,
+    TOK_PLUS,
+    TOK_MINUS,
+    TOK_STAR,
+    TOK_SLASH,
 
     /* Other */
     TOK_EOF

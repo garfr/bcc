@@ -27,14 +27,63 @@ static TAC newTAC() {
     return ret;
 }
 
+TACInst* newInstruction(TACOp op) {
+    TACInst* ret = malloc(sizeof(TACInst));
+    ret->op = op;
+    return ret;
+}
 /* Adds a copy instruction to the code */
 void addCopy(TACAddr dest, TACAddr value, TAC* tac) {
-    TACInst* code = malloc(sizeof(TACInst));
-    code->op = OP_COPY;
+    TACInst* code = newInstruction(OP_COPY);
     code->args[0] = value;
     code->args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
     code->args[2] = dest;
     pushVector(tac->codes, &code);
+}
+
+TACAddr newTemp(Type* type) {
+    static size_t currentTemp = 0;
+    return (TACAddr){.type = ADDR_TEMP,
+                     .temp = {.num = currentTemp++, .type = type}};
+}
+
+static TACOp astOpToTACOp(int binop) {
+    switch (binop) {
+        case BINOP_ADD:
+            return OP_ADD;
+        case BINOP_SUB:
+            return OP_SUB;
+        case BINOP_MULT:
+            return OP_MUL;
+        case BINOP_DIV:
+            return OP_DIV;
+    }
+    printf("internal compiler error: cannot convert ast op to TAC op.\n");
+    exit(1);
+}
+
+/* Returns the new temp addr that the expression is stored in */
+TACAddr convertExpr(TAC* tac, Expr* expr) {
+    switch (expr->type) {
+        case EXP_INT:
+            return (TACAddr){.type = ADDR_INTLIT, .intlit = expr->intlit};
+        case EXP_VAR:
+            return (TACAddr){.type = ADDR_VAR, .var = expr->var};
+        case EXP_BINOP: {
+            TACAddr addr1 = convertExpr(tac, expr->binop.exp1);
+            TACAddr addr2 = convertExpr(tac, expr->binop.exp2);
+            TACAddr newAddr = newTemp(expr->typeExpr);
+
+            TACInst* addInst = newInstruction(astOpToTACOp(expr->binop.op));
+            addInst->args[0] = addr1;
+            addInst->args[1] = addr2;
+            addInst->args[2] = newAddr;
+            pushVector(tac->codes, &addInst);
+            return newAddr;
+        }
+    }
+    printf("Internal compiler error: Cant reach this point.\n");
+    exit(1);
 }
 
 /* Very simpler conversion algorithm, will become more complex with compound
@@ -42,22 +91,11 @@ void addCopy(TACAddr dest, TACAddr value, TAC* tac) {
 void convertStmt(TAC* tac, Stmt* stmt) {
     switch (stmt->type) {
         case STMT_DEC:
-            // This translates to noop, as there are no declarations in three
-            // address code
+            // This translates to noop, as there are no declarations in
+            // three address code
             break;
         case STMT_ASSIGN: {
-            // Assignment is just a copy atm, because there are no compound
-            // expressions
-            TACAddr value;
-            switch (stmt->assign.value->type) {
-                case EXP_INT:
-                    value.intlit = stmt->assign.value->intlit;
-                    value.type = ADDR_INTLIT;
-                    break;
-                case EXP_VAR:
-                    value.var = stmt->assign.value->var;
-                    value.type = ADDR_VAR;
-            }
+            TACAddr value = convertExpr(tac, stmt->assign.value);
             TACAddr dest;
             dest.type = ADDR_VAR;
             dest.var = stmt->assign.var;
@@ -66,16 +104,7 @@ void convertStmt(TAC* tac, Stmt* stmt) {
 
         case STMT_DEC_ASSIGN: {
             // This is the same as an assignment
-            TACAddr value;
-            switch (stmt->dec_assign.value->type) {
-                case EXP_INT:
-                    value.intlit = stmt->dec_assign.value->intlit;
-                    value.type = ADDR_INTLIT;
-                    break;
-                case EXP_VAR:
-                    value.var = stmt->dec_assign.value->var;
-                    value.type = ADDR_VAR;
-            }
+            TACAddr value = convertExpr(tac, stmt->dec_assign.value);
             TACAddr dest;
             dest.type = ADDR_VAR;
             dest.var = stmt->dec_assign.var;

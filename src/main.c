@@ -1,7 +1,6 @@
 //===--------------- main.c - The home of BCC -------------------===//
 //
-// Part of BCC, which is MIT licensed
-// See https//opensource.org/licenses/MIT
+// Part of BCC, which is MIT licensed See https//opensource.org/licenses/MIT
 //
 //===----------------------------- About ---------------------------------===//
 //
@@ -29,6 +28,7 @@
 #include <fcntl.h>
 #include <lexer.h>
 #include <parser.h>
+#include <pp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

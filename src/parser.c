@@ -83,6 +83,14 @@ Expr *exprFromToken(Token tok, enum ExprType type) {
     return exp;
 }
 
+Expr *exprFromTwoPoints(size_t start, size_t end, enum ExprType type) {
+    Expr *exp = malloc(sizeof(Expr));
+    exp->type = type;
+    exp->start = start;
+    exp->end = end;
+    return exp;
+}
+
 /* Creates a new statement with a start and end point */
 Stmt *stmtFromTwoLocations(size_t start, size_t end, enum StmtType type) {
     Stmt *ret = malloc(sizeof(Stmt));
@@ -105,7 +113,7 @@ static bool compareTypes(Type *typ1, Type *typ2) {
     }
     switch (typ1->type) {
         case TYP_SINT:
-            if (typ1->intbits != typ2->intbits) {
+            if (typ1->intsize != typ2->intsize) {
                 return false;
             }
             break;
@@ -122,7 +130,7 @@ static bool compareTypes(Type *typ1, Type *typ2) {
 char *stringOfType(Type *type) {
     switch (type->type) {
         case TYP_SINT:
-            return msprintf("TYP_SINT: 's%ld'", type->intbits);
+            return msprintf("TYP_SINT: 's%ld'", type->intsize * 8);
         case TYP_INTLIT:
             return msprintf("TYP_INTLIT");
     }
@@ -160,7 +168,16 @@ Type *parseType(Parser *parser) {
         case 's':
             ret = malloc(sizeof(Type));
             ret->type = TYP_SINT;
-            ret->intbits = convertSymbolInt(tok.sym);
+            int64_t parsedSize = convertSymbolInt(tok.sym);
+            if (parsedSize % 8 != 0) {
+                queueError(
+                    msprintf("Signed and unsigned integer types must have a "
+                             "bitsize that is a power of two, not %zd",
+                             parsedSize),
+                    tok.start, tok.end);
+                printErrors();
+            }
+            ret->intsize = parsedSize / 8;
             return ret;
         default:
             queueError(
@@ -169,14 +186,12 @@ Type *parseType(Parser *parser) {
                     "and ending with a number, not '%.*s'",
                     tok.sym.len, tok.sym.text),
                 tok.start, tok.end);
-            ret = malloc(sizeof(Type));
-            ret->type = TYP_SINT;
-            ret->intbits = -1;
-            return ret;
+            printErrors();
+            exit(1);
     }
 }
 
-Expr *parseExpr(Parser *parser) {
+Expr *parsePrimary(Parser *parser) {
     Expr *ret;
 
     Token tok = nextToken(parser->lex);
@@ -210,6 +225,104 @@ Expr *parseExpr(Parser *parser) {
             /* This never gets called */ exit(1);
     }
 }
+
+int parseBinop(Parser *parser) {
+    Token tok = nextToken(parser->lex);
+    switch (tok.type) {
+        case TOK_PLUS:
+            return BINOP_ADD;
+        case TOK_MINUS:
+            return BINOP_SUB;
+        case TOK_STAR:
+            return BINOP_MULT;
+        case TOK_SLASH:
+            return BINOP_DIV;
+        default:
+            queueError(msprintf("Expected arithmetic operation"), tok.start,
+                       tok.end);
+            /* This doesn't need to fail but idc */
+            printErrors();
+            exit(1);
+    }
+}
+
+/* Returns NULL if the type cannot be coerced */
+Type *coerceType(Type *type1, Type *type2) {
+    switch (type1->type) {
+        case TYP_INTLIT:
+            switch (type2->type) {
+                case TYP_INTLIT:
+                    return type1;
+                case TYP_SINT:
+                    /* Cant cast that direction */
+                    return NULL;
+            }
+            break;
+        case TYP_SINT:
+            switch (type2->type) {
+                case TYP_INTLIT:
+                    return type1;
+                case TYP_SINT:
+                    if (type1->intsize == type2->intsize) {
+                        return type1;
+                    }
+                    return NULL;
+            }
+    }
+    return NULL;
+}
+
+Expr *parseFactor(Parser *parser) {
+    Expr *exp = parsePrimary(parser);
+
+    while (peekToken(parser->lex).type == TOK_STAR ||
+           peekToken(parser->lex).type == TOK_SLASH) {
+        int op = parseBinop(parser);
+        Expr *right = parsePrimary(parser);
+        Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
+        newExpr->binop.exp1 = exp;
+        newExpr->binop.exp2 = right;
+        newExpr->binop.op = op;
+        newExpr->typeExpr = coerceType(exp->typeExpr, right->typeExpr);
+        if (newExpr == NULL) {
+            queueError(msprintf("Cannot coerce type '%s' to '%s'",
+                                stringOfType(right->typeExpr),
+                                stringOfType(exp->typeExpr)),
+                       exp->start, right->end);
+            printErrors();
+        }
+        exp = newExpr;
+    }
+
+    return exp;
+}
+
+Expr *parseTerm(Parser *parser) {
+    Expr *exp = parseFactor(parser);
+
+    while (peekToken(parser->lex).type == TOK_PLUS ||
+           peekToken(parser->lex).type == TOK_MINUS) {
+        int op = parseBinop(parser);
+        Expr *right = parseFactor(parser);
+        Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
+        newExpr->binop.exp1 = exp;
+        newExpr->binop.exp2 = right;
+        newExpr->binop.op = op;
+        newExpr->typeExpr = coerceType(exp->typeExpr, right->typeExpr);
+        if (newExpr == NULL) {
+            queueError(msprintf("Cannot coerce type '%s' to '%s'",
+                                stringOfType(right->typeExpr),
+                                stringOfType(exp->typeExpr)),
+                       exp->start, right->end);
+            printErrors();
+        }
+        exp = newExpr;
+    }
+
+    return exp;
+}
+
+Expr *parseExpr(Parser *parser) { return parseTerm(parser); }
 
 static Stmt *parseDec(Parser *parser, Token varTok) {
     Stmt *retStmt;
@@ -396,7 +509,9 @@ AST *parseSource(Lexer *lex) {
     Vector *stmts = newVector(sizeof(Stmt *), 0);
 
     for (;;) {
-        if (peekToken(parser.lex).type == TOK_EOF) {
+        Token tok = peekToken(parser.lex);
+
+        if (tok.type == TOK_EOF) {
             break;
         }
         Stmt *stmt = parseStmt(&parser);

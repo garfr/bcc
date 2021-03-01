@@ -38,6 +38,18 @@ void printToken(Token tok) {
         case TOK_SEMICOLON:
             printf("TOK_SEMICOLON");
             break;
+        case TOK_PLUS:
+            printf("TOK_PLUS");
+            break;
+        case TOK_MINUS:
+            printf("TOK_MINUS");
+            break;
+        case TOK_STAR:
+            printf("TOK_STAR");
+            break;
+        case TOK_SLASH:
+            printf("TOK_SLASH");
+            break;
         case TOK_EQUAL:
             printf("TOK_EQUAL");
             break;
@@ -51,21 +63,47 @@ void printToken(Token tok) {
 void printType(Type *type) {
     switch (type->type) {
         case TYP_SINT:
-            printf("TYP_SINT: 's%ld'", type->intbits);
+            printf("TYP_SINT: 's%ld'", type->intsize);
             break;
         case TYP_INTLIT:
             printf("TYP_INTLIT");
     }
 }
 
+void printBinopOp(int op) {
+    switch (op) {
+        case BINOP_ADD:
+            printf("+");
+            break;
+        case BINOP_SUB:
+            printf("-");
+            break;
+        case BINOP_MULT:
+            printf("*");
+            break;
+        case BINOP_DIV:
+            printf("/");
+            break;
+    }
+}
+
 void printExpr(Expr *exp) {
     switch (exp->type) {
         case EXP_INT:
-            printf("EXP_INT: '%.*s'", (int)exp->intlit.len, exp->intlit.text);
+            printf("EXP_INT: '%.*s' : ", (int)exp->intlit.len,
+                   exp->intlit.text);
             break;
         case EXP_VAR:
             printf("EXP_VAR: '%.*s'", (int)exp->var->id.len, exp->var->id.text);
             break;
+        case EXP_BINOP:
+            printf("EXPR_BINOP: (");
+            printExpr(exp->binop.exp1);
+            printf(") ");
+            printBinopOp(exp->binop.op);
+            printf(" (");
+            printExpr(exp->binop.exp2);
+            printf(")");
     }
 
     printf(" %zd-%zd", exp->start, exp->end);
@@ -99,6 +137,13 @@ void printStmt(Stmt *stmt) {
     printf(" %zd-%zd", stmt->start, stmt->end);
 }
 
+void printAST(AST *ast) {
+    for (size_t i = 0; i < ast->stmts->numItems; i++) {
+        printStmt(*((Stmt **)indexVector(ast->stmts, i)));
+        printf("\n");
+    }
+}
+
 void printAddr(TACAddr addr) {
     switch (addr.type) {
         case ADDR_VAR:
@@ -108,7 +153,7 @@ void printAddr(TACAddr addr) {
             printf("'%.*s'", (int)addr.intlit.len, addr.intlit.text);
             break;
         case ADDR_TEMP:
-            printf("(temp: %.*s)", (int)addr.temp.len, addr.temp.text + 1);
+            printf("(temp: %zd)", addr.temp.num);
             break;
         case ADDR_EMPTY:
             break;
@@ -119,6 +164,19 @@ void printOp(TACOp op) {
     switch (op) {
         case OP_COPY:
             printf("copy");
+            break;
+        case OP_ADD:
+            printf("add");
+            break;
+        case OP_SUB:
+            printf("sub");
+            break;
+        case OP_MUL:
+            printf("mul");
+            break;
+        case OP_DIV:
+            printf("div");
+            break;
     }
 }
 

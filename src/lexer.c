@@ -123,6 +123,14 @@ Token nextToken(Lexer *lex) {
                         return makeTokenInplace(lex, TOK_COLON);
                     case '=':
                         return makeTokenInplace(lex, TOK_EQUAL);
+                    case '+':
+                        return makeTokenInplace(lex, TOK_PLUS);
+                    case '-':
+                        return makeTokenInplace(lex, TOK_MINUS);
+                    case '*':
+                        return makeTokenInplace(lex, TOK_STAR);
+                    case '/':
+                        return makeTokenInplace(lex, TOK_SLASH);
                     default: {
                         char *buffer =
                             msprintf("Unexpected character: '%c'", c);
