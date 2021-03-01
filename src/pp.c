@@ -98,6 +98,8 @@ void printExpr(Expr *exp) {
             break;
         case EXP_BINOP:
             printf("EXPR_BINOP: (");
+            printType(exp->typeExpr);
+            printf(") (");
             printExpr(exp->binop.exp1);
             printf(") ");
             printBinopOp(exp->binop.op);

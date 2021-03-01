@@ -234,20 +234,13 @@ void generateTACInst(RegAlloc* alloc, TACInst* inst, FILE* output) {
             fprintf(output, "mov %s %s, %s\n", sizeSpec, args[2], args[0]);
         } break;
         case OP_ADD: {
-            /*
-             * Given the tac form "r = a + b" restructure that into:
-             * "r = a"
-             * "r += b"
-             * Given that the add operation in x86 only takes two parameters
-             */
-
-            fprintf(output, "mov %s %s, %s\n\t", sizeSpec, args[2], args[0]);
-            fprintf(output, "add %s, %s\n", args[2], args[1]);
+            /* The TAC has already been restructured during the fixArithmetic
+             * pass, so just add val2 to the val1/dest */
+            fprintf(output, "add %s %s, %s\n", sizeSpec, args[2], args[1]);
             break;
         }
         case OP_SUB: {
-            fprintf(output, "mov %s %s, %s\n\t", sizeSpec, args[2], args[0]);
-            fprintf(output, "sub %s, %s\n", args[2], args[1]);
+            fprintf(output, "sub %s %s, %s\n", sizeSpec, args[2], args[1]);
             break;
         }
         default:

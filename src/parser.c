@@ -13,7 +13,6 @@
 //
 //===------------------------------ Todo ---------------------------------===//
 //
-// * Support arithmetic expressions with correct order of operations
 // * Type inference
 // * Continue parsing for even longer after errors occur
 //
@@ -91,8 +90,7 @@ Expr *exprFromTwoPoints(size_t start, size_t end, enum ExprType type) {
     return exp;
 }
 
-/* Creates a new statement with a start and end point */
-Stmt *stmtFromTwoLocations(size_t start, size_t end, enum StmtType type) {
+Stmt *stmtFromTwoPoints(size_t start, size_t end, enum StmtType type) {
     Stmt *ret = malloc(sizeof(Stmt));
     ret->start = start;
     ret->end = end;
@@ -169,10 +167,11 @@ Type *parseType(Parser *parser) {
             ret = malloc(sizeof(Type));
             ret->type = TYP_SINT;
             int64_t parsedSize = convertSymbolInt(tok.sym);
-            if (parsedSize % 8 != 0) {
+            if (parsedSize % 8 != 0 || parsedSize > 64) {
                 queueError(
                     msprintf("Signed and unsigned integer types must have a "
-                             "bitsize that is a power of two, not %zd",
+                             "bitsize that is a power of two and be less than "
+                             "64, not %zd",
                              parsedSize),
                     tok.start, tok.end);
                 printErrors();
@@ -359,8 +358,8 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
     switch (semicolonOrEqual.type) {
         /* Just a variable declaration */
         case TOK_SEMICOLON:
-            retStmt = stmtFromTwoLocations(varTok.start, semicolonOrEqual.end,
-                                           STMT_DEC);
+            retStmt =
+                stmtFromTwoPoints(varTok.start, semicolonOrEqual.end, STMT_DEC);
             retStmt->dec.type = type;
 
             HashEntry *entry =
@@ -383,14 +382,21 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
             Type *exprType = exp->typeExpr;
             Type *varType = type;
 
+            Type *finalType = coerceType(varType, exprType);
+            /* More semantic analysis will occur later, to ensure it fits in the
+             * type, but for now we can just cast it */
+            if (exprType->type == TYP_INTLIT && varType->type == TYP_SINT) {
+                exp->typeExpr = type;
+            }
+
             /* TODO: Do some sanity checks on the size of the integer */
-            if (compareTypes(exprType, varType) == false &&
-                (exprType->type != TYP_INTLIT || varType->type != TYP_SINT)) {
+            else if (finalType == NULL) {
                 queueError(
                     msprintf("Type of '%s' cannot be casted to "
                              "declared type of '%s'",
                              stringOfType(exp->typeExpr), stringOfType(type)),
                     exp->start, exp->end);
+                printErrors();
             }
 
             Token semicolonTok = nextToken(parser->lex);
@@ -400,8 +406,8 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
                 printErrors();
                 exit(1);
             }
-            Stmt *stmt = stmtFromTwoLocations(varTok.start, semicolonTok.end,
-                                              STMT_DEC_ASSIGN);
+            Stmt *stmt = stmtFromTwoPoints(varTok.start, semicolonTok.end,
+                                           STMT_DEC_ASSIGN);
 
             HashEntry *entry =
                 addToScope(parser->currentScope, nameTok.sym, varType);
@@ -416,7 +422,7 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
                 exit(1);
             }
 
-            stmt->dec_assign.type = type;
+            stmt->dec_assign.type = finalType;
             stmt->dec_assign.var = entry;
             stmt->dec_assign.value = exp;
             return stmt;
@@ -442,7 +448,7 @@ Stmt *parseAssignment(Parser *parser, Token symTok) {
                    semiTok.start, semiTok.end);
         printErrors();
     }
-    Stmt *ret = stmtFromTwoLocations(symTok.start, semiTok.end, STMT_ASSIGN);
+    Stmt *ret = stmtFromTwoPoints(symTok.start, semiTok.end, STMT_ASSIGN);
 
     HashEntry *entry = findInScope(parser->currentScope, symTok.sym);
     if (entry == NULL) {

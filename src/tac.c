@@ -113,10 +113,45 @@ void convertStmt(TAC* tac, Stmt* stmt) {
     }
 }
 
+/* AMD64 expects arithmetic ops to be in the form "[op] dest, value" with
+ * semantics resembling "dest [op]= value" In comparison, this TAC stores
+ * arithmetic ops in the standard "[op] val1, val2, dest" format.  To solve
+ * this, a pass will be made over the TAC to convert TAC arithmetic ops to
+ * something more easily translated to assembly. */
+Vector* fixArithmetic(Vector* oldCodes) {
+    Vector* newCodes = newVector(sizeof(TACInst*), oldCodes->numItems);
+    /* Loop over each code and translate when needed */
+    for (size_t i = 0; i < oldCodes->numItems; i++) {
+        TACInst* inst = *((TACInst**)indexVector(oldCodes, i));
+        switch (inst->op) {
+            /* Arithmetic ops will be translated to copy the arg1 value into
+             * dest, and then add arg2 into dest */
+            case OP_ADD:
+            case OP_SUB:
+            case OP_MUL:
+            case OP_DIV: {
+                TACInst* copyInst = newInstruction(OP_COPY);
+                copyInst->args[0] = inst->args[1];
+                copyInst->args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
+                copyInst->args[2] = inst->args[2];
+                pushVector(newCodes, &copyInst);
+
+                inst->args[0] = inst->args[2];
+                pushVector(newCodes, &inst);
+                break;
+                default:
+                    pushVector(newCodes, &inst);
+            }
+        }
+    }
+    return newCodes;
+}
 TAC convertAST(AST* ast) {
     TAC tac = newTAC();
     for (size_t i = 0; i < ast->stmts->numItems; i++) {
         convertStmt(&tac, *((Stmt**)indexVector(ast->stmts, i)));
     }
+
+    tac.codes = fixArithmetic(tac.codes);
     return tac;
 }
