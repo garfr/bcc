@@ -1,4 +1,4 @@
-//===------------------ types.h - Types header file --------------------===//
+//===------------------- types.h - Types header file ---------------------===//
 //
 // Part of BCC, which is MIT licensed
 // See https//opensource.org/licenses/MIT
@@ -9,7 +9,7 @@
 //
 //===---------------------------------------------------------------------===//
 
-#pragma once 
+#pragma once
 
 #include <ast.h>
 

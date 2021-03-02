@@ -98,41 +98,8 @@ Stmt *stmtFromTwoPoints(size_t start, size_t end, enum StmtType type) {
     return ret;
 }
 
-static HashEntry *addToScope(Scope *scope, Symbol sym, Type *type) {
-    TypedEntry *value = malloc(sizeof(TypedEntry));
-    value->type = type;
-    return insertHashtbl(scope->vars, sym, (void *)value);
-}
-
-/* Compares types for equality */
-static bool compareTypes(Type *typ1, Type *typ2) {
-    if (typ1->type != typ2->type) {
-        return false;
-    }
-    switch (typ1->type) {
-        case TYP_SINT:
-            if (typ1->intsize != typ2->intsize) {
-                return false;
-            }
-            break;
-        case TYP_INTLIT:
-            break;
-    }
-    return true;
-}
-
-/* This is only needed because the current error handling system does not allow
- * you to just pass a type and have the error printer call printType This means
- * an actual string must be allocated
- * When the error system is improved this can be deleted */
-char *stringOfType(Type *type) {
-    switch (type->type) {
-        case TYP_SINT:
-            return msprintf("TYP_SINT: 's%ld'", type->intsize * 8);
-        case TYP_INTLIT:
-            return msprintf("TYP_INTLIT");
-    }
-    return NULL;
+static HashEntry *addToScope(Scope *scope, Symbol sym) {
+    return insertHashtbl(scope->vars, sym, NULL);
 }
 
 /* This is a bit janky, but the idea is that given a symbol, this returns an
@@ -198,8 +165,7 @@ Expr *parsePrimary(Parser *parser) {
         case TOK_INT:
             ret = exprFromToken(tok, EXP_INT);
             ret->intlit = tok.intnum;
-            ret->typeExpr = malloc(sizeof(Type));
-            ret->typeExpr->type = TYP_INTLIT;
+            ret->typeExpr = NULL;
             return ret;
         case TOK_SYM:
             ret = exprFromToken(tok, EXP_VAR);
@@ -214,7 +180,7 @@ Expr *parsePrimary(Parser *parser) {
                 printErrors();
             }
             ret->var = entry;
-            ret->typeExpr = ((TypedEntry *)entry->data)->type;
+            ret->typeExpr = NULL;
             return ret;
         default:
             queueError(msprintf("Expected an integer or variable name for "
@@ -245,32 +211,6 @@ int parseBinop(Parser *parser) {
     }
 }
 
-/* Returns NULL if the type cannot be coerced */
-Type *coerceType(Type *type1, Type *type2) {
-    switch (type1->type) {
-        case TYP_INTLIT:
-            switch (type2->type) {
-                case TYP_INTLIT:
-                    return type1;
-                case TYP_SINT:
-                    /* Cant cast that direction */
-                    return NULL;
-            }
-            break;
-        case TYP_SINT:
-            switch (type2->type) {
-                case TYP_INTLIT:
-                    return type1;
-                case TYP_SINT:
-                    if (type1->intsize == type2->intsize) {
-                        return type1;
-                    }
-                    return NULL;
-            }
-    }
-    return NULL;
-}
-
 Expr *parseFactor(Parser *parser) {
     Expr *exp = parsePrimary(parser);
 
@@ -282,14 +222,7 @@ Expr *parseFactor(Parser *parser) {
         newExpr->binop.exp1 = exp;
         newExpr->binop.exp2 = right;
         newExpr->binop.op = op;
-        newExpr->typeExpr = coerceType(exp->typeExpr, right->typeExpr);
-        if (newExpr == NULL) {
-            queueError(msprintf("Cannot coerce type '%s' to '%s'",
-                                stringOfType(right->typeExpr),
-                                stringOfType(exp->typeExpr)),
-                       exp->start, right->end);
-            printErrors();
-        }
+        newExpr->typeExpr = NULL;
         exp = newExpr;
     }
 
@@ -307,14 +240,7 @@ Expr *parseTerm(Parser *parser) {
         newExpr->binop.exp1 = exp;
         newExpr->binop.exp2 = right;
         newExpr->binop.op = op;
-        newExpr->typeExpr = coerceType(exp->typeExpr, right->typeExpr);
-        if (newExpr == NULL) {
-            queueError(msprintf("Cannot coerce type '%s' to '%s'",
-                                stringOfType(right->typeExpr),
-                                stringOfType(exp->typeExpr)),
-                       exp->start, right->end);
-            printErrors();
-        }
+        newExpr->typeExpr = NULL;
         exp = newExpr;
     }
 
@@ -360,10 +286,13 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
         case TOK_SEMICOLON:
             retStmt =
                 stmtFromTwoPoints(varTok.start, semicolonOrEqual.end, STMT_DEC);
-            retStmt->dec.type = type;
 
-            HashEntry *entry =
-                addToScope(parser->currentScope, nameTok.sym, type);
+            HashEntry *entry = addToScope(parser->currentScope, nameTok.sym);
+
+            TypedEntry *typeInfo = malloc(sizeof(TypedEntry));
+            typeInfo->type = type;
+            entry->data = typeInfo;
+
             if (entry == NULL) {
                 queueError(msprintf("Cannot redeclare variable: '%.*s' in "
                                     "the same scope",
@@ -372,32 +301,13 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
                 /* Must fail */
                 printErrors();
             }
+
             retStmt->dec.var = entry;
             return retStmt;
 
         /* Compound variable declaration and assignment */
         case TOK_EQUAL: {
             Expr *exp = parseExpr(parser);
-
-            Type *exprType = exp->typeExpr;
-            Type *varType = type;
-
-            Type *finalType = coerceType(varType, exprType);
-            /* More semantic analysis will occur later, to ensure it fits in the
-             * type, but for now we can just cast it */
-            if (exprType->type == TYP_INTLIT && varType->type == TYP_SINT) {
-                exp->typeExpr = type;
-            }
-
-            /* TODO: Do some sanity checks on the size of the integer */
-            else if (finalType == NULL) {
-                queueError(
-                    msprintf("Type of '%s' cannot be casted to "
-                             "declared type of '%s'",
-                             stringOfType(exp->typeExpr), stringOfType(type)),
-                    exp->start, exp->end);
-                printErrors();
-            }
 
             Token semicolonTok = nextToken(parser->lex);
             if (semicolonTok.type != TOK_SEMICOLON) {
@@ -409,8 +319,8 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
             Stmt *stmt = stmtFromTwoPoints(varTok.start, semicolonTok.end,
                                            STMT_DEC_ASSIGN);
 
-            HashEntry *entry =
-                addToScope(parser->currentScope, nameTok.sym, varType);
+            HashEntry *entry = addToScope(parser->currentScope, nameTok.sym);
+
             if (entry == NULL) {
                 printf("ERROR COCCURED\n");
                 queueError(msprintf("Cannot redeclare variable: '%.*s' in "
@@ -422,7 +332,7 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
                 exit(1);
             }
 
-            stmt->dec_assign.type = finalType;
+            stmt->dec_assign.type = type;
             stmt->dec_assign.var = entry;
             stmt->dec_assign.value = exp;
             return stmt;
@@ -451,6 +361,7 @@ Stmt *parseAssignment(Parser *parser, Token symTok) {
     Stmt *ret = stmtFromTwoPoints(symTok.start, semiTok.end, STMT_ASSIGN);
 
     HashEntry *entry = findInScope(parser->currentScope, symTok.sym);
+
     if (entry == NULL) {
         queueError(msprintf("Cannot find variable: '%.*s' in scope",
                             symTok.sym.len, (char *)symTok.sym.text),
@@ -458,17 +369,6 @@ Stmt *parseAssignment(Parser *parser, Token symTok) {
         printErrors();
     }
 
-    Type *varType = ((TypedEntry *)entry->data)->type;
-    Type *exprType = value->typeExpr;
-
-    if (compareTypes(varType, exprType) == false &&
-        ((exprType->type != TYP_INTLIT) || ((varType->type != TYP_SINT)))) {
-        queueError(msprintf("Type of '%s' cannot be casted to "
-                            "declared type of '%s'",
-                            stringOfType(value->typeExpr),
-                            stringOfType(((TypedEntry *)entry->data)->type)),
-                   value->start, value->end);
-    }
     ret->assign.var = entry;
     ret->assign.value = value;
     return ret;

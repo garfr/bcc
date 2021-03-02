@@ -116,7 +116,7 @@ void printStmt(Stmt *stmt) {
         case STMT_DEC:
             printf("STMT_DEC: '%.*s' : ", (int)stmt->dec.var->id.len,
                    stmt->dec.var->id.text);
-            printType(stmt->dec.type);
+            printType(((TypedEntry *)stmt->dec.var->data)->type);
             printf("'");
             break;
         case STMT_DEC_ASSIGN:

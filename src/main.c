@@ -35,6 +35,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <tac.h>
+#include <types.h>
 #include <unistd.h>
 
 int main(int argc, char *argv[]) {
@@ -80,6 +81,7 @@ int main(int argc, char *argv[]) {
     Lexer lex = newLexer(mapped_file, file_stats.st_size);
 
     AST *ast = parseSource(&lex);
+    annotateAST(ast);
 
     if (errorsExist()) {
         printErrors();
@@ -87,12 +89,13 @@ int main(int argc, char *argv[]) {
 
     TAC tac = convertAST(ast);
 
+    printTAC(&tac);
 
     if (errorsExist()) {
         printErrors();
     }
 
-    generateCode(&tac, ast->globalScope->vars, stdout);
+    /*generateCode(&tac, ast->globalScope->vars, stdout);*/
 
     if (errorsExist()) {
         printErrors();

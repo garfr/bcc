@@ -1,4 +1,4 @@
-//===------------------ ast.h - Defines the abstract syntax tree --------------------===//
+//===------------- ast.h - Defines the abstract syntax tree --------------===//
 //
 // Part of BCC, which is MIT licensed
 // See https//opensource.org/licenses/MIT
@@ -9,11 +9,11 @@
 //
 //===---------------------------------------------------------------------===//
 
-#pragma once 
+#pragma once
 
-#include <utils.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <utils.h>
 
 /* A variant enum representing a compound type expression, which will include
  * arrays, pointers, and user defined records, enums, and tuples later */
@@ -59,7 +59,6 @@ typedef struct Stmt {
     union {
         struct {
             HashEntry *var;
-            Type *type;
         } dec;
 
         struct {
