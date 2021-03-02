@@ -148,15 +148,34 @@ void typeStmt(Scope* scope, Stmt* stmt) {
             break;
         case STMT_DEC_ASSIGN: {
             typeExpression(scope, stmt->dec_assign.value);
-            Type* type = coerceAssignment(stmt->dec_assign.type,
-                                          stmt->dec_assign.value->typeExpr);
-            if (type == NULL) {
-                queueError(
-                    msprintf("Cannot coerce type %s to %s",
-                             stringOfType(stmt->dec_assign.type),
-                             stringOfType(stmt->dec_assign.value->typeExpr)),
-                    stmt->dec_assign.value->start, stmt->dec_assign.value->end);
-                printErrors();
+
+            Type* type;
+            // The type is inferred
+            if (stmt->dec_assign.type == NULL) {
+                if (stmt->dec_assign.value->typeExpr->type) {
+                    queueError(
+                        msprintf("Cannot infer the type of a declaration from "
+                                 "only a integer literal"),
+                        stmt->dec_assign.value->start,
+                        stmt->dec_assign.value->end);
+                    printErrors();
+                }
+                type = stmt->dec_assign.value->typeExpr;
+                stmt->dec_assign.type = type;
+            }
+
+            else {
+                type = coerceAssignment(stmt->dec_assign.type,
+                                        stmt->dec_assign.value->typeExpr);
+                if (type == NULL) {
+                    queueError(msprintf("Cannot coerce type %s to %s",
+                                        stringOfType(stmt->dec_assign.type),
+                                        stringOfType(
+                                            stmt->dec_assign.value->typeExpr)),
+                               stmt->dec_assign.value->start,
+                               stmt->dec_assign.value->end);
+                    printErrors();
+                }
             }
 
             TypedEntry* entry = malloc(sizeof(TypedEntry));

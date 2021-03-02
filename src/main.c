@@ -82,6 +82,7 @@ int main(int argc, char *argv[]) {
 
     AST *ast = parseSource(&lex);
     annotateAST(ast);
+    printAST(ast);
 
     if (errorsExist()) {
         printErrors();

@@ -63,7 +63,7 @@ void printToken(Token tok) {
 void printType(Type *type) {
     switch (type->type) {
         case TYP_SINT:
-            printf("TYP_SINT: 's%ld'", type->intsize);
+            printf("'s%ld'", type->intsize * 8);
             break;
         case TYP_INTLIT:
             printf("TYP_INTLIT");
@@ -124,7 +124,7 @@ void printStmt(Stmt *stmt) {
                 "STMT_DEC_ASSIGN: '%.*s' : ", (int)stmt->dec_assign.var->id.len,
                 stmt->dec_assign.var->id.text);
             printType(stmt->dec_assign.type);
-            printf("' = (");
+            printf(" = (");
             printExpr(stmt->dec_assign.value);
             printf(")");
             break;

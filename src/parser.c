@@ -22,6 +22,7 @@
 #include <error.h>
 #include <lexer.h>
 #include <parser.h>
+#include <pp.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -258,22 +259,40 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
         nameTok = continueUntil(parser->lex, TOK_SYM_BITS);
     }
 
-    /* Expect a colon */
-    Token colonTok = nextToken(parser->lex);
-    if (colonTok.type != TOK_COLON) {
-        queueError(msprintf("Expected ':' after variable name and before "
-                            "variable type in variable declaration"),
-                   colonTok.start, colonTok.end);
-        colonTok = continueUntil(parser->lex, TOK_COLON_BITS);
+    /* Expect a colon or an equals size */
+    Token colonEqualTok = peekToken(parser->lex);
+    if (colonEqualTok.type != TOK_COLON && colonEqualTok.type != TOK_EQUAL) {
+        queueError(
+            msprintf("Expected ':' or '=' after variable name and before "
+                     "variable type in variable declaration, not "),
+            colonEqualTok.start, colonEqualTok.end);
+        colonEqualTok =
+            continueUntil(parser->lex, TOK_COLON_BITS | TOK_EQUAL_BITS);
     }
 
-    Type *type = parseType(parser);
+    Type *type;
+
+    switch (colonEqualTok.type) {
+        case TOK_COLON:
+            nextToken(parser->lex);
+            type = parseType(parser);
+            break;
+        case TOK_EQUAL:
+            /* The type should be inferred */
+            printf("infer.\n");
+            type = NULL;
+            break;
+        default:
+            // This is unreachable
+            exit(1);
+    }
 
     /* Should either be a semicolon or an equals sign */
     Token semicolonOrEqual = nextToken(parser->lex);
 
     if (semicolonOrEqual.type != TOK_SEMICOLON &&
         semicolonOrEqual.type != TOK_EQUAL) {
+        printToken(semicolonOrEqual);
         queueError(msprintf("Expected '=' or ';' after declaring the "
                             "type and name of a variable"),
                    semicolonOrEqual.start, semicolonOrEqual.end);
@@ -284,6 +303,11 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
     switch (semicolonOrEqual.type) {
         /* Just a variable declaration */
         case TOK_SEMICOLON:
+            if (type == NULL) {
+                queueError("Cannot infer type when no value is given",
+                           varTok.start, semicolonOrEqual.end);
+                printErrors();
+            }
             retStmt =
                 stmtFromTwoPoints(varTok.start, semicolonOrEqual.end, STMT_DEC);
 
