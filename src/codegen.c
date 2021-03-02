@@ -209,6 +209,7 @@ void generateTACInst(RegAlloc* alloc, TACInst* inst, FILE* output) {
                 args[i] = NULL;
         }
     }
+
     char* sizeSpec;
     switch (firstSize) {
         case 1:

@@ -87,13 +87,12 @@ int main(int argc, char *argv[]) {
 
     TAC tac = convertAST(ast);
 
-    printTAC(&tac);
 
     if (errorsExist()) {
         printErrors();
     }
 
-    /*generateCode(&tac, ast->globalScope->vars, stdout);*/
+    generateCode(&tac, ast->globalScope->vars, stdout);
 
     if (errorsExist()) {
         printErrors();

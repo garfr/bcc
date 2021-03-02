@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <tac.h>
+#include <pp.h>
 
 static TAC newTAC() {
     TAC ret;
@@ -131,7 +132,7 @@ Vector* fixArithmetic(Vector* oldCodes) {
             case OP_MUL:
             case OP_DIV: {
                 TACInst* copyInst = newInstruction(OP_COPY);
-                copyInst->args[0] = inst->args[1];
+                copyInst->args[0] = inst->args[0];
                 copyInst->args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
                 copyInst->args[2] = inst->args[2];
                 pushVector(newCodes, &copyInst);
