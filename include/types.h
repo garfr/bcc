@@ -1,20 +1,17 @@
-//===------------------ parser.h - Parser header file --------------------===//
+//===------------------ types.h - Types header file --------------------===//
 //
 // Part of BCC, which is MIT licensed
 // See https//opensource.org/licenses/MIT
 //
 //===----------------------------- About ---------------------------------===//
 //
-// Provides functions for parsing a file into an untyped syntax tree.
+// Provides type definitions for the AST.
 //
 //===---------------------------------------------------------------------===//
 
-#pragma once
+#pragma once 
 
-#include <lexer.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <utils.h>
 #include <ast.h>
 
-AST *parseSource(Lexer *lex);
+/* Traverses the AST and gives types to all values */
+void annotateAST(AST* ast);
