@@ -33,9 +33,11 @@ static Type* IntegerLit = &(Type){.type = TYP_INTLIT, {}};
 char* stringOfType(Type* type) {
     switch (type->type) {
         case TYP_SINT:
-            return msprintf("TYP_SINT: 's%ld'", type->intsize * 8);
+            return msprintf("s%ld", type->intsize * 8);
+        case TYP_UINT:
+            return msprintf("u%ld", type->intsize * 8);
         case TYP_INTLIT:
-            return msprintf("TYP_INTLIT");
+            return msprintf("integer literal");
     }
     return NULL;
 }
@@ -61,6 +63,21 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                                 return type1;
                             }
                             return NULL;
+                        case TYP_UINT:
+                            return NULL;
+                        case TYP_INTLIT:
+                            return type1;
+                    }
+                    break;
+                case TYP_UINT:
+                    switch (type2->type) {
+                        case TYP_UINT:
+                            if (type1->intsize == type2->intsize) {
+                                return type1;
+                            }
+                            return NULL;
+                        case TYP_SINT:
+                            return NULL;
                         case TYP_INTLIT:
                             return type1;
                     }
@@ -68,6 +85,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                 case TYP_INTLIT:
                     switch (type2->type) {
                         case TYP_SINT:
+                        case TYP_UINT:
                         case TYP_INTLIT:
                             return type1;
                     }
@@ -86,6 +104,21 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                     if (type1->intsize == type2->intsize) {
                         return type1;
                     }
+                    return NULL;
+                case TYP_UINT:
+                    return NULL;
+                case TYP_INTLIT:
+                    return type1;
+            }
+            break;
+        case TYP_UINT:
+            switch (type2->type) {
+                case TYP_UINT:
+                    if (type1->intsize == type2->intsize) {
+                        return type1;
+                    }
+                    return NULL;
+                case TYP_SINT:
                     return NULL;
                 case TYP_INTLIT:
                     return type1;
@@ -150,9 +183,10 @@ void typeStmt(Scope* scope, Stmt* stmt) {
             typeExpression(scope, stmt->dec_assign.value);
 
             Type* type;
-            // The type is inferred
+
+            // The type was left to be inferred
             if (stmt->dec_assign.type == NULL) {
-                if (stmt->dec_assign.value->typeExpr->type) {
+                if (stmt->dec_assign.value->typeExpr->type == TYP_INTLIT) {
                     queueError(
                         msprintf("Cannot infer the type of a declaration from "
                                  "only a integer literal"),
@@ -194,11 +228,10 @@ void typeStmt(Scope* scope, Stmt* stmt) {
                 coerceAssignment(entry->type, stmt->assign.value->typeExpr);
 
             if (type == NULL) {
-                queueError(
-                    msprintf("Cannot coerce type %s to %s",
-                             stringOfType(stmt->dec_assign.type),
-                             stringOfType(stmt->dec_assign.value->typeExpr)),
-                    stmt->dec_assign.value->start, stmt->dec_assign.value->end);
+                queueError(msprintf("Cannot coerce type %s to %s",
+                                    stringOfType(entry->type),
+                                    stringOfType(stmt->assign.value->typeExpr)),
+                           stmt->assign.value->start, stmt->assign.value->end);
                 printErrors();
             }
             break;

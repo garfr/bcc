@@ -20,6 +20,7 @@
 typedef struct Type {
     enum TypeType {
         TYP_SINT,
+        TYP_UINT,
         TYP_INTLIT,
     } type;
 

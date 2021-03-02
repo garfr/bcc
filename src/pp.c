@@ -65,6 +65,9 @@ void printType(Type *type) {
         case TYP_SINT:
             printf("'s%ld'", type->intsize * 8);
             break;
+        case TYP_UINT:
+            printf("'u%ld'", type->intsize * 8);
+            break;
         case TYP_INTLIT:
             printf("TYP_INTLIT");
     }
@@ -155,7 +158,7 @@ void printAddr(TACAddr addr) {
             printf("'%.*s'", (int)addr.intlit.len, addr.intlit.text);
             break;
         case ADDR_TEMP:
-            printf("(temp: %zd)", addr.temp.num);
+            printf("*t%zd", addr.temp.num);
             break;
         case ADDR_EMPTY:
             break;
@@ -185,11 +188,17 @@ void printOp(TACOp op) {
 void printInst(TACInst *inst) {
     printOp(inst->op);
     printf(": [");
-    printAddr(inst->args[0]);
-    printf(", ");
-    printAddr(inst->args[1]);
-    printf(", ");
-    printAddr(inst->args[2]);
+    if (inst->args[0].type != ADDR_EMPTY) {
+        printAddr(inst->args[0]);
+        printf(", ");
+    }
+    if (inst->args[1].type != ADDR_EMPTY) {
+        printAddr(inst->args[1]);
+        printf(", ");
+    }
+    if (inst->args[2].type != ADDR_EMPTY) {
+        printAddr(inst->args[2]);
+    }
     printf("]");
 }
 

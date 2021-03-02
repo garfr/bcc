@@ -13,11 +13,12 @@
 //
 //===------------------------------ Todo ---------------------------------===//
 //
-// * Type inference
 // * Continue parsing for even longer after errors occur
+// * Parse function definitions
 //
 //===---------------------------------------------------------------------===//
 
+#include <assert.h>
 #include <ctype.h>
 #include <error.h>
 #include <lexer.h>
@@ -51,14 +52,12 @@ enum TokTypeBits {
  * then returned */
 Token continueUntil(Lexer *lex, int bitFlags) {
     Token tok;
-    /* TODO: Make this not shit */
     for (;;) {
         tok = peekToken(lex);
         if (tok.type == TOK_EOF) {
             printErrors();
             exit(1);
         }
-        /* Bit flags suck and so does C */
         if ((tok.type == TOK_SYM && bitFlags & TOK_SYM_BITS) ||
             (tok.type == TOK_INT && bitFlags & TOK_INT_BITS) ||
             (tok.type == TOK_SEMICOLON && bitFlags & TOK_SEMICOLON_BITS) ||
@@ -103,19 +102,31 @@ static HashEntry *addToScope(Scope *scope, Symbol sym) {
     return insertHashtbl(scope->vars, sym, NULL);
 }
 
-/* This is a bit janky, but the idea is that given a symbol, this returns an
- * integer if it fits the form x[integer] where x can be any character
- * Its used to find the bit size of builtin integer types */
-int64_t convertSymbolInt(Symbol sym) {
+/* This is a bit janky, but the idea is that given a token, this returns an
+ * integer of the number of bytes the type uses if it fits the form x[integer]
+ * where x can be any character. It's used to find the bit size of builtin
+ * integer types */
+int64_t convertSymbolInt(Token tok) {
+    assert(tok.type == TOK_SYM);
+
     int64_t ret = 0;
-    for (size_t i = 1; i < sym.len; i++) {
-        if (!isdigit(sym.text[i])) {
+    for (size_t i = 1; i < tok.sym.len; i++) {
+        if (!isdigit(tok.sym.text[i])) {
             return -1;
         }
         ret *= 10;
-        ret += sym.text[i] - '0';
+        ret += tok.sym.text[i] - '0';
     }
-    return ret;
+    if (ret % 8 != 0 || ret > 64) {
+        queueError(msprintf("Signed and unsigned integer types must have a "
+                            "bitsize that is a power of two and be less than "
+                            "64, not %zd",
+                            ret),
+                   tok.start, tok.end);
+        printErrors();
+    }
+
+    return ret / 8;
 }
 
 Type *parseType(Parser *parser) {
@@ -134,17 +145,12 @@ Type *parseType(Parser *parser) {
         case 's':
             ret = malloc(sizeof(Type));
             ret->type = TYP_SINT;
-            int64_t parsedSize = convertSymbolInt(tok.sym);
-            if (parsedSize % 8 != 0 || parsedSize > 64) {
-                queueError(
-                    msprintf("Signed and unsigned integer types must have a "
-                             "bitsize that is a power of two and be less than "
-                             "64, not %zd",
-                             parsedSize),
-                    tok.start, tok.end);
-                printErrors();
-            }
-            ret->intsize = parsedSize / 8;
+            ret->intsize = convertSymbolInt(tok);
+            return ret;
+        case 'u':
+            ret = malloc(sizeof(Type));
+            ret->type = TYP_UINT;
+            ret->intsize = convertSymbolInt(tok);
             return ret;
         default:
             queueError(
@@ -278,12 +284,11 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
             type = parseType(parser);
             break;
         case TOK_EQUAL:
-            /* The type should be inferred */
-            printf("infer.\n");
+            /* The type will be inferred by the following expression */
             type = NULL;
             break;
         default:
-            // This is unreachable
+            // This is unreachable, given the if statement above
             exit(1);
     }
 

@@ -57,6 +57,8 @@ size_t calculateSize(Type* type) {
     switch (type->type) {
         case TYP_SINT:
             return type->intsize;
+        case TYP_UINT:
+            return type->intsize;
         case TYP_INTLIT:
             /* For now just use 64 bits, later some semantic stuff will happen
              */
