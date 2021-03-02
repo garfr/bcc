@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <utils.h>
@@ -78,6 +79,7 @@ typedef struct Stmt {
  * This will grow as more information is collected */
 typedef struct {
     Type *type;
+    bool isMut;
 } TypedEntry;
 
 /* The full abstract syntax tree that currently is just a vector of

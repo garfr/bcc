@@ -212,9 +212,8 @@ void typeStmt(Scope* scope, Stmt* stmt) {
                 }
             }
 
-            TypedEntry* entry = malloc(sizeof(TypedEntry));
+            TypedEntry* entry = stmt->dec_assign.var->data;
             entry->type = type;
-            stmt->dec_assign.var->data = entry;
         } break;
 
         case STMT_ASSIGN: {
@@ -224,6 +223,14 @@ void typeStmt(Scope* scope, Stmt* stmt) {
 
             TypedEntry* entry = (TypedEntry*)stmt->assign.var->data;
 
+            if (!entry->isMut) {
+                queueError(
+                    msprintf("Cannot assign to immutable variable '%.*s'",
+                             stmt->assign.var->id.len,
+                             stmt->assign.var->id.text),
+                    stmt->start, stmt->end);
+                return;
+            }
             Type* type =
                 coerceAssignment(entry->type, stmt->assign.value->typeExpr);
 

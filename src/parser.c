@@ -98,8 +98,11 @@ Stmt *stmtFromTwoPoints(size_t start, size_t end, enum StmtType type) {
     return ret;
 }
 
-static HashEntry *addToScope(Scope *scope, Symbol sym) {
-    return insertHashtbl(scope->vars, sym, NULL);
+static HashEntry *addToScope(Scope *scope, Symbol sym, bool isMut) {
+    TypedEntry *entry = calloc(1, sizeof(entry));
+    entry->isMut = isMut;
+    entry->type = NULL;
+    return insertHashtbl(scope->vars, sym, entry);
 }
 
 /* This is a bit janky, but the idea is that given a token, this returns an
@@ -256,7 +259,7 @@ Expr *parseTerm(Parser *parser) {
 
 Expr *parseExpr(Parser *parser) { return parseTerm(parser); }
 
-static Stmt *parseDec(Parser *parser, Token varTok) {
+static Stmt *parseDec(Parser *parser, Token varTok, bool isMut) {
     Stmt *retStmt;
     Token nameTok = nextToken(parser->lex);
     if (nameTok.type != TOK_SYM) {
@@ -316,11 +319,8 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
             retStmt =
                 stmtFromTwoPoints(varTok.start, semicolonOrEqual.end, STMT_DEC);
 
-            HashEntry *entry = addToScope(parser->currentScope, nameTok.sym);
-
-            TypedEntry *typeInfo = malloc(sizeof(TypedEntry));
-            typeInfo->type = type;
-            entry->data = typeInfo;
+            HashEntry *entry =
+                addToScope(parser->currentScope, nameTok.sym, isMut);
 
             if (entry == NULL) {
                 queueError(msprintf("Cannot redeclare variable: '%.*s' in "
@@ -348,7 +348,8 @@ static Stmt *parseDec(Parser *parser, Token varTok) {
             Stmt *stmt = stmtFromTwoPoints(varTok.start, semicolonTok.end,
                                            STMT_DEC_ASSIGN);
 
-            HashEntry *entry = addToScope(parser->currentScope, nameTok.sym);
+            HashEntry *entry =
+                addToScope(parser->currentScope, nameTok.sym, isMut);
 
             if (entry == NULL) {
                 printf("ERROR COCCURED\n");
@@ -406,14 +407,16 @@ Stmt *parseAssignment(Parser *parser, Token symTok) {
 Stmt *parseStmt(Parser *parser) {
     Token tok = nextToken(parser->lex);
 
-    if (tok.type != TOK_LET && tok.type != TOK_SYM) {
+    if (tok.type != TOK_LET && tok.type != TOK_MUT && tok.type != TOK_SYM) {
         queueError(msprintf("Expeted 'var' or a symbol to begin a statement"),
                    tok.start, tok.end);
         tok = continueUntil(parser->lex, TOK_LET_BITS | TOK_SYM_BITS);
     }
     switch (tok.type) {
         case TOK_LET:
-            return parseDec(parser, tok);
+            return parseDec(parser, tok, false);
+        case TOK_MUT:
+            return parseDec(parser, tok, true);
         case TOK_SYM:
             return parseAssignment(parser, tok);
         default:
