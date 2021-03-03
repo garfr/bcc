@@ -37,6 +37,8 @@ typedef struct {
     Lexer *lex;
 } Parser;
 
+static Type *VoidType = &(Type){.type = TYP_VOID, {}};
+
 /* Bit flags used by continueUntil to allow continuing until one of several
  * tokens is reached */
 enum TokTypeBits {
@@ -46,6 +48,8 @@ enum TokTypeBits {
     TOK_EQUAL_BITS = 1 << 3,
     TOK_SYM_BITS = 1 << 4,
     TOK_LET_BITS = 1 << 5,
+    TOK_ARROW_BITS = 1 << 6,
+    TOK_LPAREN_BITS = 1 << 7,
 };
 
 /* Runs through tokens until a token passed in bitflags is reached, which is
@@ -136,34 +140,42 @@ Type *parseType(Parser *parser) {
     Type *ret;
 
     Token tok = nextToken(parser->lex);
-    if (tok.type != TOK_SYM) {
+    if (tok.type != TOK_SYM && tok.type != TOK_VOID) {
         queueError(msprintf("Unexpected token, expected type to be a "
                             "single symbol, arrays "
                             "and pointers are not supported"),
                    tok.start, tok.end);
         tok = continueUntil(parser->lex, TOK_SYM_BITS);
     }
+    switch (tok.type) {
+        case TOK_SYM:
+            switch (tok.sym.text[0]) {
+                case 's':
+                    ret = malloc(sizeof(Type));
+                    ret->type = TYP_SINT;
+                    ret->intsize = convertSymbolInt(tok);
+                    return ret;
+                case 'u':
+                    ret = malloc(sizeof(Type));
+                    ret->type = TYP_UINT;
+                    ret->intsize = convertSymbolInt(tok);
+                    return ret;
+                default:
+                    queueError(msprintf("Expected type to be a symbol with "
+                                        "first character 's' "
+                                        "and ending with a number, not '%.*s'",
+                                        tok.sym.len, tok.sym.text),
+                               tok.start, tok.end);
+                    printErrors();
+                    exit(1);
+            }
+            break;
+        case TOK_VOID:
+            return VoidType;
 
-    switch (tok.sym.text[0]) {
-        case 's':
-            ret = malloc(sizeof(Type));
-            ret->type = TYP_SINT;
-            ret->intsize = convertSymbolInt(tok);
-            return ret;
-        case 'u':
-            ret = malloc(sizeof(Type));
-            ret->type = TYP_UINT;
-            ret->intsize = convertSymbolInt(tok);
-            return ret;
         default:
-            queueError(
-                msprintf(
-                    "Expected type to be a symbol with first character 's' "
-                    "and ending with a number, not '%.*s'",
-                    tok.sym.len, tok.sym.text),
-                tok.start, tok.end);
-            printErrors();
-            exit(1);
+            assert(false);
+            return NULL;
     }
 }
 
@@ -285,6 +297,11 @@ static Stmt *parseDec(Parser *parser, Token varTok, bool isMut) {
         case TOK_COLON:
             nextToken(parser->lex);
             type = parseType(parser);
+            if (type == VoidType) {
+                queueError("Cannot declare a variable with type void",
+                           nameTok.start, nameTok.end);
+                printErrors();
+            }
             break;
         case TOK_EQUAL:
             /* The type will be inferred by the following expression */
@@ -425,6 +442,121 @@ Stmt *parseStmt(Parser *parser) {
     }
 }
 
+Param parseParam(Parser *parser) {
+    Token symTok = nextToken(parser->lex);
+    if (symTok.type != TOK_SYM) {
+        queueError("Expected parameter name", symTok.start, symTok.end);
+        symTok = continueUntil(parser->lex, TOK_SYM_BITS);
+    }
+    Token colonType = nextToken(parser->lex);
+    if (colonType.type != TOK_COLON) {
+        queueError("Expected ':' after parameter name", symTok.start,
+                   symTok.end);
+        symTok = continueUntil(parser->lex, TOK_COLON_BITS);
+    }
+
+    Type *type = parseType(parser);
+
+    Token commaType = peekToken(parser->lex);
+    if (commaType.type == TOK_COMMA) {
+        nextToken(parser->lex);
+    }
+
+    return (Param){.name = symTok.sym, .type = type};
+}
+
+Vector *parseParams(Parser *parser) {
+    Vector *ret = newVector(sizeof(Param), 0);
+
+    Token lparenTok = nextToken(parser->lex);
+    if (lparenTok.type != TOK_LPAREN) {
+        queueError("Expected '(' before function paremeters", lparenTok.start,
+                   lparenTok.end);
+        lparenTok = continueUntil(parser->lex, TOK_LPAREN_BITS);
+    }
+
+    for (;;) {
+        Token tok = peekToken(parser->lex);
+        if (tok.type == TOK_RPAREN) {
+            nextToken(parser->lex);
+            return ret;
+        } else {
+            Param param = parseParam(parser);
+            pushVector(ret, &param);
+        }
+    }
+}
+
+Function *parseFunction(Parser *parser) {
+    Token symTok = nextToken(parser->lex);
+
+    if (symTok.type != TOK_SYM) {
+        queueError("Expected variable name after 'proc' keyword", symTok.start,
+                   symTok.end);
+        symTok = continueUntil(parser->lex, TOK_SYM_BITS);
+    }
+
+    Vector *params = parseParams(parser);
+
+    Token arrowTok = nextToken(parser->lex);
+    if (arrowTok.type != TOK_ARROW) {
+        queueError("Expected '->' after function parameters", arrowTok.start,
+                   arrowTok.end);
+        arrowTok = continueUntil(parser->lex, TOK_ARROW_BITS);
+    }
+
+    Type *retType = parseType(parser);
+
+    /* Allocate a new scope for the function */
+    Scope *newScope = malloc(sizeof(Scope));
+    newScope->upScope = parser->currentScope;
+    newScope->vars = newHashtbl(params->numItems);
+    parser->currentScope = newScope;
+
+    /* Add the funcion parameters to the scope */
+    for (size_t i = 0; i < params->numItems; i++) {
+        Param param = *((Param *)indexVector(params, i));
+        TypedEntry *entry = malloc(sizeof(TypedEntry));
+        entry->isMut = false;
+        entry->type = param.type;
+
+        insertHashtbl(parser->currentScope->vars, param.name, entry);
+    }
+
+    Vector *stmts = newVector(sizeof(Stmt *), 0);
+
+    for (;;) {
+        Token tok = peekToken(parser->lex);
+        if (tok.type == TOK_END) {
+            nextToken(parser->lex);
+            break;
+        }
+        Stmt *stmt = parseStmt(parser);
+        pushVector(stmts, &stmt);
+    }
+
+    Function *fun = malloc(sizeof(Function));
+    fun->name = symTok.sym;
+    fun->params = params;
+    fun->retType = retType;
+    fun->scope = parser->currentScope;
+    fun->stmts = stmts;
+
+    return fun;
+}
+
+Toplevel parseToplevel(Parser *parser) {
+    Token keywordTok = nextToken(parser->lex);
+    switch (keywordTok.type) {
+        case TOK_PROC:
+            return (Toplevel){.type = TOP_PROC, .fn = parseFunction(parser)};
+        default:
+            printToken(keywordTok);
+            printf("Internal compiler error: No global vars yet.\n");
+            exit(1);
+    }
+}
+
 static Parser newParser(Lexer *lex) {
     Parser ret;
     ret.lex = lex;
@@ -444,20 +576,25 @@ static Scope *getGlobalScope(Scope *scope) {
 
 AST *parseSource(Lexer *lex) {
     Parser parser = newParser(lex);
-    Vector *stmts = newVector(sizeof(Stmt *), 0);
+    Vector *decs = newVector(sizeof(Toplevel), 0);
 
     for (;;) {
         Token tok = peekToken(parser.lex);
 
-        if (tok.type == TOK_EOF) {
-            break;
+        switch (tok.type) {
+            case TOK_EOF:
+                /* Im sorry djikstra but no named break is a deal breaker */
+                goto done;
+            default: {
+                Toplevel top = parseToplevel(&parser);
+                pushVector(decs, &top);
+            }
         }
-        Stmt *stmt = parseStmt(&parser);
-        pushVector(stmts, &stmt);
     }
-
+done : {
     AST *ret = malloc(sizeof(AST));
-    ret->stmts = stmts;
+    ret->decs = decs;
     ret->globalScope = getGlobalScope(parser.currentScope);
     return ret;
+}
 }

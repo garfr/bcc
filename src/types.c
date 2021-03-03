@@ -34,10 +34,12 @@ char* stringOfType(Type* type) {
     switch (type->type) {
         case TYP_SINT:
             return msprintf("s%ld", type->intsize * 8);
+        case TYP_VOID:
+            return "void";
         case TYP_UINT:
             return msprintf("u%ld", type->intsize * 8);
         case TYP_INTLIT:
-            return msprintf("integer literal");
+            return "integer literal";
     }
     return NULL;
 }
@@ -64,6 +66,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                             }
                             return NULL;
                         case TYP_UINT:
+                        case TYP_VOID:
                             return NULL;
                         case TYP_INTLIT:
                             return type1;
@@ -77,6 +80,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                             }
                             return NULL;
                         case TYP_SINT:
+                        case TYP_VOID:
                             return NULL;
                         case TYP_INTLIT:
                             return type1;
@@ -88,7 +92,12 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                         case TYP_UINT:
                         case TYP_INTLIT:
                             return type1;
+                        case TYP_VOID:
+                            return NULL;
                     }
+                    break;
+                case TYP_VOID:
+                    return NULL;
             }
             break;
     }
@@ -106,6 +115,7 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                     }
                     return NULL;
                 case TYP_UINT:
+                case TYP_VOID:
                     return NULL;
                 case TYP_INTLIT:
                     return type1;
@@ -119,11 +129,13 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                     }
                     return NULL;
                 case TYP_SINT:
+                case TYP_VOID:
                     return NULL;
                 case TYP_INTLIT:
                     return type1;
             }
             break;
+        case TYP_VOID:
         case TYP_INTLIT:
             /* An integer literal should not be on the left side of an
              * assignment */
@@ -202,12 +214,12 @@ void typeStmt(Scope* scope, Stmt* stmt) {
                 type = coerceAssignment(stmt->dec_assign.type,
                                         stmt->dec_assign.value->typeExpr);
                 if (type == NULL) {
-                    queueError(msprintf("Cannot coerce type %s to %s",
-                                        stringOfType(stmt->dec_assign.type),
-                                        stringOfType(
-                                            stmt->dec_assign.value->typeExpr)),
-                               stmt->dec_assign.value->start,
-                               stmt->dec_assign.value->end);
+                    queueError(
+                        msprintf("Cannot coerce type %s to %s",
+                                 stringOfType(stmt->dec_assign.value->typeExpr),
+                                 stringOfType(stmt->dec_assign.type)),
+                        stmt->dec_assign.value->start,
+                        stmt->dec_assign.value->end);
                     printErrors();
                 }
             }
@@ -246,8 +258,22 @@ void typeStmt(Scope* scope, Stmt* stmt) {
     }
 }
 
+void typeToplevel(Toplevel* top) {
+    switch (top->type) {
+        case TOP_VAR:
+            printf(
+                "Internal compiler error: No global variable support yet.\n");
+            exit(1);
+        case TOP_PROC: {
+            for (size_t i = 0; i < top->fn->stmts->numItems; i++) {
+                typeStmt(top->fn->scope,
+                         *((Stmt**)indexVector(top->fn->stmts, i)));
+            }
+        }
+    }
+}
 void annotateAST(AST* ast) {
-    for (size_t i = 0; i < ast->stmts->numItems; i++) {
-        typeStmt(ast->globalScope, *(Stmt**)indexVector(ast->stmts, i));
+    for (size_t i = 0; i < ast->decs->numItems; i++) {
+        typeToplevel(indexVector(ast->decs, i));
     }
 }

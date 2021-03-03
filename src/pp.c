@@ -13,6 +13,7 @@
 #include <lexer.h>
 #include <parser.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <tac.h>
 
 void printToken(Token tok) {
@@ -23,8 +24,14 @@ void printToken(Token tok) {
         case TOK_PROC:
             printf("TOK_PROC");
             break;
+        case TOK_END:
+            printf("TOK_END");
+            break;
         case TOK_MUT:
             printf("TOK_MUT");
+            break;
+        case TOK_VOID:
+            printf("TOK_VOID");
             break;
         case TOK_SYM:
             printf("TOK_SYM: '%.*s'", (int)tok.sym.len, tok.sym.text);
@@ -37,6 +44,18 @@ void printToken(Token tok) {
             break;
         case TOK_SEMICOLON:
             printf("TOK_SEMICOLON");
+            break;
+        case TOK_LPAREN:
+            printf("TOK_LPAREN");
+            break;
+        case TOK_RPAREN:
+            printf("TOK_RPAREN");
+            break;
+        case TOK_COMMA:
+            printf("TOK_COMMA");
+            break;
+        case TOK_ARROW:
+            printf("TOK_ARROW");
             break;
         case TOK_PLUS:
             printf("TOK_PLUS");
@@ -67,6 +86,9 @@ void printType(Type *type) {
             break;
         case TYP_UINT:
             printf("'u%ld'", type->intsize * 8);
+            break;
+        case TYP_VOID:
+            printf("void");
             break;
         case TYP_INTLIT:
             printf("TYP_INTLIT");
@@ -142,9 +164,39 @@ void printStmt(Stmt *stmt) {
     printf(" %zd-%zd", stmt->start, stmt->end);
 }
 
+void printParams(Vector *params) {
+    size_t i;
+    for (i = 0; i < params->numItems - 1; i++) {
+        Param param = *((Param *)indexVector(params, i));
+        printf("%.*s : ", (int)param.name.len, param.name.text);
+        printType(param.type);
+        printf(", ");
+    }
+    Param param = *((Param *)indexVector(params, i));
+    printf("%.*s : ", (int)param.name.len, param.name.text);
+    printType(param.type);
+}
+
+void printToplevel(Toplevel top) {
+    switch (top.type) {
+        case TOP_VAR:
+            printf("Internal compiler error: Not global variables yet.\n");
+            exit(1);
+        case TOP_PROC:
+            printf("%.*s (", (int)top.fn->name.len, top.fn->name.text);
+            printParams(top.fn->params);
+            printf(") -> ");
+            printType(top.fn->retType);
+            printf("\n");
+            for (size_t i = 0; i < top.fn->stmts->numItems; i++) {
+                printf("\t");
+                printStmt(*((Stmt **)indexVector(top.fn->stmts, i)));
+            }
+    }
+}
 void printAST(AST *ast) {
-    for (size_t i = 0; i < ast->stmts->numItems; i++) {
-        printStmt(*((Stmt **)indexVector(ast->stmts, i)));
+    for (size_t i = 0; i < ast->decs->numItems; i++) {
+        printToplevel(*((Toplevel *)indexVector(ast->decs, i)));
         printf("\n");
     }
 }

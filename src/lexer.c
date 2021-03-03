@@ -44,6 +44,14 @@ static Token makeTokenInplace(Lexer *lex, enum TokenType type) {
     return tok;
 }
 
+static Token makeTokenBehind(Lexer *lex, enum TokenType type) {
+    Token tok = (Token){
+        .start = lex->startIdx, .end = lex->endIdx - 1, .type = type, {}};
+    lex->endIdx++;
+    lex->startIdx = lex->endIdx;
+    lex->state = LEX_START;
+    return tok;
+}
 /* Generates a symbol token one character behind where the lexer is currently,
  * and resets the lexer to begin tokenizing then next token */
 static Token makeSymbolBehind(Lexer *lex) {
@@ -61,6 +69,10 @@ static Token makeSymbolBehind(Lexer *lex) {
         tok.type = TOK_PROC;
     } else if (compareSymbolStr(sym, "mut") == 0) {
         tok.type = TOK_MUT;
+    } else if (compareSymbolStr(sym, "end") == 0) {
+        tok.type = TOK_END;
+    } else if (compareSymbolStr(sym, "void") == 0) {
+        tok.type = TOK_VOID;
     } else {
         tok.sym = sym;
         tok.type = TOK_SYM;
@@ -117,6 +129,10 @@ Token nextToken(Lexer *lex) {
                     continue;
                 }
                 switch (c) {
+                    case '-':
+                        lex->endIdx++;
+                        lex->state = LEX_DASH;
+                        continue;
                     case ';':
                         return makeTokenInplace(lex, TOK_SEMICOLON);
                     case ':':
@@ -125,10 +141,14 @@ Token nextToken(Lexer *lex) {
                         return makeTokenInplace(lex, TOK_EQUAL);
                     case '+':
                         return makeTokenInplace(lex, TOK_PLUS);
-                    case '-':
-                        return makeTokenInplace(lex, TOK_MINUS);
                     case '*':
                         return makeTokenInplace(lex, TOK_STAR);
+                    case ')':
+                        return makeTokenInplace(lex, TOK_RPAREN);
+                    case ',':
+                        return makeTokenInplace(lex, TOK_COMMA);
+                    case '(':
+                        return makeTokenInplace(lex, TOK_LPAREN);
                     case '/':
                         return makeTokenInplace(lex, TOK_SLASH);
                     default: {
@@ -140,6 +160,16 @@ Token nextToken(Lexer *lex) {
                         continue;
                     }
                 }
+            }
+            case LEX_DASH: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeTokenBehind(lex, TOK_MINUS);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (c == '>') {
+                    return makeTokenInplace(lex, TOK_ARROW);
+                }
+                return makeTokenBehind(lex, TOK_MINUS);
             }
             case LEX_SYMBOL: {
                 if (lex->endIdx >= lex->bufferLen) {

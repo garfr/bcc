@@ -22,6 +22,7 @@ typedef struct Type {
     enum TypeType {
         TYP_SINT,
         TYP_UINT,
+        TYP_VOID,
         TYP_INTLIT,
     } type;
 
@@ -75,6 +76,21 @@ typedef struct Stmt {
     };
 } Stmt;
 
+/* A function definition */
+
+typedef struct {
+    Symbol name;
+    Type *type;
+} Param;
+
+typedef struct {
+    Symbol name;
+    Vector *params;  // Param
+    Type *retType;
+    Vector *stmts;  // *Stmt
+    Scope *scope;
+} Function;
+
 /* The value that the AST symbol table hashes too
  * This will grow as more information is collected */
 typedef struct {
@@ -82,9 +98,20 @@ typedef struct {
     bool isMut;
 } TypedEntry;
 
+typedef struct {
+    enum {
+        TOP_VAR,
+        TOP_PROC,
+    } type;
+    union {
+        Stmt *var;
+        Function *fn;
+    };
+} Toplevel;
+
 /* The full abstract syntax tree that currently is just a vector of
  * statments and a global scope */
 typedef struct {
-    Vector *stmts;
+    Vector *decs;  // Toplevel
     Scope *globalScope;
 } AST;

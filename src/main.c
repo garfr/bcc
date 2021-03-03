@@ -88,9 +88,9 @@ int main(int argc, char *argv[]) {
         printErrors();
     }
 
-    TAC tac = convertAST(ast);
+    /*TAC tac = convertAST(ast);*/
 
-    printTAC(&tac);
+    /*printTAC(&tac);*/
 
     if (errorsExist()) {
         printErrors();

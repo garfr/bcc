@@ -19,6 +19,8 @@ enum TokenType {
     TOK_LET,
     TOK_PROC,
     TOK_MUT,
+    TOK_END,
+    TOK_VOID,
 
     /* Symbols, and other values */
     TOK_SYM,
@@ -27,8 +29,12 @@ enum TokenType {
     /* Punctuation */
     TOK_COLON,
     TOK_SEMICOLON,
+    TOK_COMMA,
+    TOK_ARROW,
     TOK_EQUAL,
     TOK_PLUS,
+    TOK_LPAREN,
+    TOK_RPAREN,
     TOK_MINUS,
     TOK_STAR,
     TOK_SLASH,
@@ -51,7 +57,7 @@ typedef struct {
 
 } Token;
 
-enum LexerState { LEX_START, LEX_SYMBOL, LEX_INT };
+enum LexerState { LEX_START, LEX_SYMBOL, LEX_INT, LEX_DASH };
 
 typedef struct {
     const unsigned char *buffer;
