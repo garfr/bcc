@@ -40,6 +40,8 @@ char* stringOfType(Type* type) {
             return msprintf("u%ld", type->intsize * 8);
         case TYP_INTLIT:
             return "integer literal";
+        case TYP_FUN:
+            return "function pointer";
     }
     return NULL;
 }
@@ -67,6 +69,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                             return NULL;
                         case TYP_UINT:
                         case TYP_VOID:
+                        case TYP_FUN:
                             return NULL;
                         case TYP_INTLIT:
                             return type1;
@@ -80,6 +83,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                             }
                             return NULL;
                         case TYP_SINT:
+                        case TYP_FUN:
                         case TYP_VOID:
                             return NULL;
                         case TYP_INTLIT:
@@ -90,6 +94,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                     switch (type2->type) {
                         case TYP_SINT:
                         case TYP_UINT:
+                        case TYP_FUN:
                         case TYP_INTLIT:
                             return type1;
                         case TYP_VOID:
@@ -98,6 +103,16 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                     break;
                 case TYP_VOID:
                     return NULL;
+                case TYP_FUN:
+                    switch (type2->type) {
+                        case TYP_SINT:
+                        case TYP_UINT:
+                        case TYP_INTLIT:
+                        case TYP_VOID:
+                        case TYP_FUN:
+                            return NULL;
+                    }
+                    break;
             }
             break;
     }
@@ -116,6 +131,7 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                     return NULL;
                 case TYP_UINT:
                 case TYP_VOID:
+                case TYP_FUN:
                     return NULL;
                 case TYP_INTLIT:
                     return type1;
@@ -129,6 +145,7 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                     }
                     return NULL;
                 case TYP_SINT:
+                case TYP_FUN:
                 case TYP_VOID:
                     return NULL;
                 case TYP_INTLIT:
@@ -137,6 +154,7 @@ Type* coerceAssignment(Type* type1, Type* type2) {
             break;
         case TYP_VOID:
         case TYP_INTLIT:
+        case TYP_FUN:
             /* An integer literal should not be on the left side of an
              * assignment */
             return NULL;
@@ -149,6 +167,34 @@ void typeExpression(Scope* scope, Expr* exp) {
     assert(exp != NULL);
 
     switch (exp->type) {
+        case EXP_FUNCALL: {
+            Type* fun = ((TypedEntry*)exp->funcall.name->data)->type;
+            if (fun->fun.args->numItems != exp->funcall.arguments->numItems) {
+                queueError(msprintf("Function call has %zd arguments, but %zd "
+                                    "were expected",
+                                    exp->funcall.arguments->numItems,
+                                    fun->fun.args->numItems),
+                           exp->start, exp->end);
+            }
+
+            else {
+                for (size_t i = 0; i < exp->funcall.arguments->numItems; i++) {
+                    Expr* thisExp =
+                        *((Expr**)indexVector(exp->funcall.arguments, i));
+                    typeExpression(scope, thisExp);
+                    Type* wantedType = *((Type**)indexVector(fun->fun.args, i));
+                    if (coerceAssignment(wantedType, thisExp->typeExpr) ==
+                        NULL) {
+                        queueError(
+                            msprintf(
+                                "Function expected expression of type %s, not "
+                                "but got %s",
+                                stringOfType(wantedType), thisExp->typeExpr),
+                            thisExp->start, thisExp->end);
+                    }
+                }
+            }
+        } break;
         case EXP_INT:
             exp->typeExpr = IntegerLit;
             exp->typeExpr->type = TYP_INTLIT;

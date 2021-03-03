@@ -92,6 +92,19 @@ void printType(Type *type) {
             break;
         case TYP_INTLIT:
             printf("TYP_INTLIT");
+            break;
+        case TYP_FUN: {
+            printf("(");
+            size_t i;
+            for (i = 0; i < type->fun.args->numItems - 1; i++) {
+                printType(*((Type **)indexVector(type->fun.args, i)));
+                printf(", ");
+            }
+            printType(*((Type **)indexVector(type->fun.args, i)));
+            printf(") -> ");
+            printType(type->fun.retType);
+            break;
+        }
     }
 }
 
@@ -122,7 +135,7 @@ void printExpr(Expr *exp) {
             printf("EXP_VAR: '%.*s'", (int)exp->var->id.len, exp->var->id.text);
             break;
         case EXP_BINOP:
-            printf("EXPR_BINOP: (");
+            printf("EXP_BINOP: (");
             printType(exp->typeExpr);
             printf(") (");
             printExpr(exp->binop.exp1);
@@ -131,6 +144,16 @@ void printExpr(Expr *exp) {
             printf(" (");
             printExpr(exp->binop.exp2);
             printf(")");
+            break;
+        case EXP_FUNCALL: {
+            printf("EXP_FUNCALL: %.*s(", (int)exp->funcall.name->id.len,
+                   exp->funcall.name->id.text);
+            for (size_t i = 0; i < exp->funcall.arguments->numItems; i++) {
+                printExpr(*((Expr **)indexVector(exp->funcall.arguments, i)));
+            }
+            printf(")");
+            break;
+        }
     }
 
     printf(" %zd-%zd", exp->start, exp->end);
@@ -166,14 +189,17 @@ void printStmt(Stmt *stmt) {
 
 void printParams(Vector *params) {
     size_t i;
+    if (params->numItems == 0) {
+        return;
+    }
     for (i = 0; i < params->numItems - 1; i++) {
         Param param = *((Param *)indexVector(params, i));
-        printf("%.*s : ", (int)param.name.len, param.name.text);
+        printf("%.*s : ", (int)param.var->id.len, param.var->id.text);
         printType(param.type);
         printf(", ");
     }
     Param param = *((Param *)indexVector(params, i));
-    printf("%.*s : ", (int)param.name.len, param.name.text);
+    printf("%.*s : ", (int)param.var->id.len, param.var->id.text);
     printType(param.type);
 }
 
@@ -212,6 +238,9 @@ void printAddr(TACAddr addr) {
         case ADDR_TEMP:
             printf("*t%zd", addr.temp.num);
             break;
+        case ADDR_TAG:
+            printf("@%.*s", (int)addr.tag->id.len, addr.tag->id.text);
+            break;
         case ADDR_EMPTY:
             break;
     }
@@ -234,24 +263,39 @@ void printOp(TACOp op) {
         case OP_DIV:
             printf("div");
             break;
+        case OP_ADDPARAM:
+            printf("addparam");
+            break;
+        case OP_GETPARAM:
+            printf("getparam");
+            break;
+        case OP_CALL:
+            printf("call");
+            break;
     }
 }
 
 void printInst(TACInst *inst) {
-    printOp(inst->op);
-    printf(": [");
-    if (inst->args[0].type != ADDR_EMPTY) {
-        printAddr(inst->args[0]);
-        printf(", ");
+    switch (inst->type) {
+        case INST_TAG:
+            printf("\n%.*s: ", (int)inst->sym.len, inst->sym.text);
+            break;
+        case INST_OP:
+            printOp(inst->op.op);
+            printf("(");
+            if (inst->op.args[0].type != ADDR_EMPTY) {
+                printAddr(inst->op.args[0]);
+                printf(", ");
+            }
+            if (inst->op.args[1].type != ADDR_EMPTY) {
+                printAddr(inst->op.args[1]);
+                printf(", ");
+            }
+            if (inst->op.args[2].type != ADDR_EMPTY) {
+                printAddr(inst->op.args[2]);
+            }
+            printf(")");
     }
-    if (inst->args[1].type != ADDR_EMPTY) {
-        printAddr(inst->args[1]);
-        printf(", ");
-    }
-    if (inst->args[2].type != ADDR_EMPTY) {
-        printAddr(inst->args[2]);
-    }
-    printf("]");
 }
 
 void printTAC(TAC *tac) {

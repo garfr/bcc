@@ -24,11 +24,16 @@ typedef struct Type {
         TYP_UINT,
         TYP_VOID,
         TYP_INTLIT,
+        TYP_FUN,
     } type;
 
     union {
         /* Size of the integer in bytes, must be a power of 2 */
         int64_t intsize;
+        struct {
+            Vector *args;  // Types*
+            struct Type *retType;
+        } fun;
     };
 } Type;
 
@@ -37,7 +42,7 @@ typedef struct Expr {
     size_t start;
     size_t end;
 
-    enum ExprType { EXP_INT, EXP_VAR, EXP_BINOP } type;
+    enum ExprType { EXP_INT, EXP_VAR, EXP_BINOP, EXP_FUNCALL } type;
 
     Type *typeExpr;
     union {
@@ -49,6 +54,11 @@ typedef struct Expr {
             struct Expr *exp2;
             enum { BINOP_ADD, BINOP_SUB, BINOP_MULT, BINOP_DIV } op;
         } binop;
+
+        struct {
+            HashEntry *name;
+            Vector *arguments;  // Expr*
+        } funcall;
     };
 } Expr;
 
@@ -79,7 +89,7 @@ typedef struct Stmt {
 /* A function definition */
 
 typedef struct {
-    Symbol name;
+    HashEntry *var;
     Type *type;
 } Param;
 

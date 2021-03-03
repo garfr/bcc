@@ -22,7 +22,6 @@
 //
 //===---------------------------------------------------------------------===//
 
-#include <codegen.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -82,15 +81,16 @@ int main(int argc, char *argv[]) {
 
     AST *ast = parseSource(&lex);
     annotateAST(ast);
-    printAST(ast);
+
+    /*printAST(ast);*/
 
     if (errorsExist()) {
         printErrors();
     }
 
-    /*TAC tac = convertAST(ast);*/
+    TAC tac = convertAST(ast);
 
-    /*printTAC(&tac);*/
+    printTAC(&tac);
 
     if (errorsExist()) {
         printErrors();

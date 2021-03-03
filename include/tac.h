@@ -23,6 +23,9 @@ typedef enum {
     OP_MUL,
     OP_DIV,
 
+    OP_GETPARAM,
+    OP_ADDPARAM,
+    OP_CALL,
 } TACOp;
 
 /* A variant enum representing a single address in the TAC */
@@ -32,6 +35,7 @@ typedef struct {
         ADDR_TEMP,
         ADDR_INTLIT,
         ADDR_EMPTY,
+        ADDR_TAG,
     } type;
 
     union {
@@ -41,17 +45,28 @@ typedef struct {
             size_t num;
             Type* type;
         } temp;
+        HashEntry* tag;
     };
 } TACAddr;
 
 /* One isntruction in the three address code, represented as quadruples */
 typedef struct {
-    TACOp op;
-    TACAddr args[3];
+    enum {
+        INST_OP,
+        INST_TAG,
+    } type;
+    union {
+        struct {
+            TACOp op;
+            TACAddr args[3];
+        } op;
+        Symbol sym;
+    };
 } TACInst;
 
 typedef struct {
     Vector* codes;
+    Hashtbl* tags;
 } TAC;
 
 TAC convertAST(AST* ast);

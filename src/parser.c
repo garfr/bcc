@@ -14,7 +14,6 @@
 //===------------------------------ Todo ---------------------------------===//
 //
 // * Continue parsing for even longer after errors occur
-// * Parse function definitions
 //
 //===---------------------------------------------------------------------===//
 
@@ -103,7 +102,7 @@ Stmt *stmtFromTwoPoints(size_t start, size_t end, enum StmtType type) {
 }
 
 static HashEntry *addToScope(Scope *scope, Symbol sym, bool isMut) {
-    TypedEntry *entry = calloc(1, sizeof(entry));
+    TypedEntry *entry = calloc(1, sizeof(TypedEntry));
     entry->isMut = isMut;
     entry->type = NULL;
     return insertHashtbl(scope->vars, sym, entry);
@@ -179,6 +178,43 @@ Type *parseType(Parser *parser) {
     }
 }
 
+Expr *parseExpr(Parser *parser);
+
+Expr *parseFuncall(Parser *parser, Token symTok) {
+    HashEntry *value = findInScope(parser->currentScope, symTok.sym);
+    if (value == NULL) {
+        queueError(msprintf("Cannot find variable '%.*s' in scope",
+                            symTok.sym.len, symTok.sym.text),
+                   symTok.start, symTok.end);
+        printErrors();
+    }
+
+    Token lparenTok = nextToken(parser->lex);
+    if (lparenTok.type != TOK_LPAREN) {
+        queueError("Expected '(' before function call parameters",
+                   lparenTok.start, lparenTok.end);
+        lparenTok = continueUntil(parser->lex, TOK_LPAREN_BITS);
+    }
+
+    Vector *args = newVector(sizeof(Expr *), 0);
+
+    while (peekToken(parser->lex).type != TOK_RPAREN) {
+        Expr *expr = parseExpr(parser);
+        pushVector(args, &expr);
+    }
+
+    Token endTok = nextToken(parser->lex);
+
+    Expr *funcall = malloc(sizeof(Expr));
+    funcall->type = EXP_FUNCALL;
+    funcall->funcall.arguments = args;
+    funcall->funcall.name = value;
+    funcall->start = symTok.start;
+    funcall->typeExpr = ((TypedEntry *)value->data)->type->fun.retType;
+    funcall->end = endTok.end;
+    return funcall;
+}
+
 Expr *parsePrimary(Parser *parser) {
     Expr *ret;
 
@@ -190,6 +226,11 @@ Expr *parsePrimary(Parser *parser) {
             ret->typeExpr = NULL;
             return ret;
         case TOK_SYM:
+
+            if (peekToken(parser->lex).type == TOK_LPAREN) {
+                return parseFuncall(parser, tok);
+            }
+
             ret = exprFromToken(tok, EXP_VAR);
 
             HashEntry *entry = findInScope(parser->currentScope, tok.sym);
@@ -442,7 +483,7 @@ Stmt *parseStmt(Parser *parser) {
     }
 }
 
-Param parseParam(Parser *parser) {
+Param parseParam(Scope *scope, Parser *parser) {
     Token symTok = nextToken(parser->lex);
     if (symTok.type != TOK_SYM) {
         queueError("Expected parameter name", symTok.start, symTok.end);
@@ -461,11 +502,15 @@ Param parseParam(Parser *parser) {
     if (commaType.type == TOK_COMMA) {
         nextToken(parser->lex);
     }
+    TypedEntry *entry = malloc(sizeof(TypedEntry));
+    entry->isMut = false;
+    entry->type = type;
 
-    return (Param){.name = symTok.sym, .type = type};
+    return (Param){.var = insertHashtbl(scope->vars, symTok.sym, entry),
+                   .type = type};
 }
 
-Vector *parseParams(Parser *parser) {
+Vector *parseParams(Scope *scope, Parser *parser) {
     Vector *ret = newVector(sizeof(Param), 0);
 
     Token lparenTok = nextToken(parser->lex);
@@ -481,7 +526,7 @@ Vector *parseParams(Parser *parser) {
             nextToken(parser->lex);
             return ret;
         } else {
-            Param param = parseParam(parser);
+            Param param = parseParam(scope, parser);
             pushVector(ret, &param);
         }
     }
@@ -496,7 +541,13 @@ Function *parseFunction(Parser *parser) {
         symTok = continueUntil(parser->lex, TOK_SYM_BITS);
     }
 
-    Vector *params = parseParams(parser);
+    /* Allocate a new scope for the function */
+    Scope *newScope = malloc(sizeof(Scope));
+    newScope->upScope = parser->currentScope;
+    newScope->vars = newHashtbl(0);
+    parser->currentScope = newScope;
+
+    Vector *params = parseParams(parser->currentScope, parser);
 
     Token arrowTok = nextToken(parser->lex);
     if (arrowTok.type != TOK_ARROW) {
@@ -507,21 +558,23 @@ Function *parseFunction(Parser *parser) {
 
     Type *retType = parseType(parser);
 
-    /* Allocate a new scope for the function */
-    Scope *newScope = malloc(sizeof(Scope));
-    newScope->upScope = parser->currentScope;
-    newScope->vars = newHashtbl(params->numItems);
-    parser->currentScope = newScope;
+    Vector *paramTypes = newVector(sizeof(Type *), params->numItems);
 
-    /* Add the funcion parameters to the scope */
     for (size_t i = 0; i < params->numItems; i++) {
-        Param param = *((Param *)indexVector(params, i));
-        TypedEntry *entry = malloc(sizeof(TypedEntry));
-        entry->isMut = false;
-        entry->type = param.type;
-
-        insertHashtbl(parser->currentScope->vars, param.name, entry);
+        Type *paramType = ((Param *)indexVector(params, i))->type;
+        pushVector(paramTypes, &paramType);
     }
+
+    Type *functionType = malloc(sizeof(Type));
+    functionType->type = TYP_FUN;
+    functionType->fun.args = paramTypes;
+    functionType->fun.retType = retType;
+
+    TypedEntry *funEntry = malloc(sizeof(TypedEntry));
+    funEntry->isMut = false;
+    funEntry->type = functionType;
+
+    insertHashtbl(parser->currentScope->vars, symTok.sym, funEntry);
 
     Vector *stmts = newVector(sizeof(Stmt *), 0);
 

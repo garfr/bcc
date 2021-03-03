@@ -17,28 +17,30 @@
 //===---------------------------------------------------------------------===//
 
 #include <parser.h>
+#include <pp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <tac.h>
-#include <pp.h>
 
 static TAC newTAC() {
     TAC ret;
+    ret.tags = newHashtbl(0);
     ret.codes = newVector(sizeof(TACInst*), 0);
     return ret;
 }
 
 TACInst* newInstruction(TACOp op) {
-    TACInst* ret = malloc(sizeof(TACInst));
-    ret->op = op;
+    TACInst* ret = calloc(1, sizeof(TACInst));
+    ret->type = INST_OP;
+    ret->op.op = op;
     return ret;
 }
 /* Adds a copy instruction to the code */
 void addCopy(TACAddr dest, TACAddr value, TAC* tac) {
     TACInst* code = newInstruction(OP_COPY);
-    code->args[0] = value;
-    code->args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
-    code->args[2] = dest;
+    code->op.args[0] = value;
+    code->op.args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
+    code->op.args[2] = dest;
     pushVector(tac->codes, &code);
 }
 
@@ -76,12 +78,35 @@ TACAddr convertExpr(TAC* tac, Expr* expr) {
             TACAddr newAddr = newTemp(expr->typeExpr);
 
             TACInst* addInst = newInstruction(astOpToTACOp(expr->binop.op));
-            addInst->args[0] = addr1;
-            addInst->args[1] = addr2;
-            addInst->args[2] = newAddr;
+            addInst->op.args[0] = addr1;
+            addInst->op.args[1] = addr2;
+            addInst->op.args[2] = newAddr;
             pushVector(tac->codes, &addInst);
             return newAddr;
         }
+        case EXP_FUNCALL:
+            /* Push the parameters */
+            for (size_t i = 0; i < expr->funcall.arguments->numItems; i++) {
+                TACAddr addr = convertExpr(
+                    tac, *(Expr**)indexVector(expr->funcall.arguments, i));
+                TACInst* paramPush = newInstruction(OP_ADDPARAM);
+                paramPush->op.op = OP_ADDPARAM;
+                paramPush->op.args[0] = (TACAddr){.type = ADDR_EMPTY, {}};
+                paramPush->op.args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
+                paramPush->op.args[2] = addr;
+                pushVector(tac->codes, &paramPush);
+            }
+
+            TACInst* callInst = newInstruction(OP_CALL);
+            callInst->op.args[0] = (TACAddr){
+                .type = ADDR_TAG,
+                .tag = findHashtbl(tac->tags, expr->funcall.name->id)};
+            callInst->op.args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
+            TACAddr ret = newTemp(
+                ((TypedEntry*)expr->funcall.name->data)->type->fun.retType);
+            callInst->op.args[2] = ret;
+            pushVector(tac->codes, &callInst);
+            return ret;
     }
     printf("Internal compiler error: Cant reach this point.\n");
     exit(1);
@@ -113,7 +138,30 @@ void convertStmt(TAC* tac, Stmt* stmt) {
         }
     }
 }
+void convertParam(TAC* tac, HashEntry* var) {
+    TACInst* op = newInstruction(OP_GETPARAM);
+    op->op.args[0] = (TACAddr){.type = ADDR_EMPTY, {}};
+    op->op.args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
+    op->op.args[2] = (TACAddr){.type = ADDR_VAR, .var = var};
+    pushVector(tac->codes, &op);
+}
 
+void convertToplevel(TAC* tac, Toplevel top) {
+    TACInst* tag = calloc(1, sizeof(TACInst));
+    tag->type = INST_TAG;
+    tag->sym = top.fn->name;
+    pushVector(tac->codes, &tag);
+
+    /* Add this location to the symbol table */
+    insertHashtbl(tac->tags, tag->sym, tag);
+
+    for (size_t i = 0; i < top.fn->params->numItems; i++) {
+        convertParam(tac, ((Param*)indexVector(top.fn->params, i))->var);
+    }
+    for (size_t i = 0; i < top.fn->stmts->numItems; i++) {
+        convertStmt(tac, *((Stmt**)indexVector(top.fn->stmts, i)));
+    }
+}
 /* AMD64 expects arithmetic ops to be in the form "[op] dest, value" with
  * semantics resembling "dest [op]= value" In comparison, this TAC stores
  * arithmetic ops in the standard "[op] val1, val2, dest" format.  To solve
@@ -124,33 +172,43 @@ Vector* fixArithmetic(Vector* oldCodes) {
     /* Loop over each code and translate when needed */
     for (size_t i = 0; i < oldCodes->numItems; i++) {
         TACInst* inst = *((TACInst**)indexVector(oldCodes, i));
-        switch (inst->op) {
-            /* Arithmetic ops will be translated to copy the arg1 value into
-             * dest, and then add arg2 into dest */
-            case OP_ADD:
-            case OP_SUB:
-            case OP_MUL:
-            case OP_DIV: {
-                TACInst* copyInst = newInstruction(OP_COPY);
-                copyInst->args[0] = inst->args[0];
-                copyInst->args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
-                copyInst->args[2] = inst->args[2];
-                pushVector(newCodes, &copyInst);
-
-                inst->args[0] = inst->args[2];
+        switch (inst->type) {
+            case INST_TAG:
                 pushVector(newCodes, &inst);
                 break;
-                default:
-                    pushVector(newCodes, &inst);
+            case INST_OP: {
+                switch (inst->op.op) {
+                    /* Arithmetic ops will be translated to copy the arg1
+                     * value into dest, and then add arg2 into dest */
+                    case OP_ADD:
+                    case OP_SUB:
+                    case OP_MUL:
+                    case OP_DIV: {
+                        TACInst* copyInst = newInstruction(OP_COPY);
+                        copyInst->op.args[0] = inst->op.args[0];
+                        copyInst->op.args[1] =
+                            (TACAddr){.type = ADDR_EMPTY, {}};
+                        copyInst->op.args[2] = inst->op.args[2];
+                        pushVector(newCodes, &copyInst);
+
+                        inst->op.args[0] = inst->op.args[2];
+                        pushVector(newCodes, &inst);
+                        break;
+                        default:
+                            pushVector(newCodes, &inst);
+                    }
+                }
             }
         }
     }
     return newCodes;
 }
+
 TAC convertAST(AST* ast) {
     TAC tac = newTAC();
-    for (size_t i = 0; i < ast->stmts->numItems; i++) {
-        convertStmt(&tac, *((Stmt**)indexVector(ast->stmts, i)));
+
+    for (size_t i = 0; i < ast->decs->numItems; i++) {
+        convertToplevel(&tac, *((Toplevel*)indexVector(ast->decs, i)));
     }
 
     tac.codes = fixArithmetic(tac.codes);
