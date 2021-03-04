@@ -73,6 +73,8 @@ static Token makeSymbolBehind(Lexer *lex) {
         tok.type = TOK_END;
     } else if (compareSymbolStr(sym, "void") == 0) {
         tok.type = TOK_VOID;
+    } else if (compareSymbolStr(sym, "return") == 0) {
+        tok.type = TOK_RETURN;
     } else {
         tok.sym = sym;
         tok.type = TOK_SYM;

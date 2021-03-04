@@ -67,7 +67,7 @@ typedef struct Stmt {
     size_t start;
     size_t end;
 
-    enum StmtType { STMT_DEC, STMT_DEC_ASSIGN, STMT_ASSIGN } type;
+    enum StmtType { STMT_DEC, STMT_DEC_ASSIGN, STMT_ASSIGN, STMT_RETURN } type;
 
     union {
         struct {
@@ -83,6 +83,8 @@ typedef struct Stmt {
             HashEntry *var;
             Expr *value;
         } assign;
+
+        Expr *returnExp;
     };
 } Stmt;
 
@@ -99,6 +101,9 @@ typedef struct {
     Type *retType;
     Vector *stmts;  // *Stmt
     Scope *scope;
+
+    size_t start;
+    size_t end;
 } Function;
 
 /* The value that the AST symbol table hashes too

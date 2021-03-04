@@ -21,6 +21,9 @@ void printToken(Token tok) {
         case TOK_LET:
             printf("TOK_LET");
             break;
+        case TOK_RETURN:
+            printf("TOK_RETURN");
+            break;
         case TOK_PROC:
             printf("TOK_PROC");
             break;
@@ -167,6 +170,13 @@ void printStmt(Stmt *stmt) {
             printType(((TypedEntry *)stmt->dec.var->data)->type);
             printf("'");
             break;
+        case STMT_RETURN:
+            printf("STMT_RETURN ");
+            if (stmt->returnExp != NULL) {
+                printf(": ");
+                printExpr(stmt->returnExp);
+            }
+            break;
         case STMT_DEC_ASSIGN:
             printf(
                 "STMT_DEC_ASSIGN: '%.*s' : ", (int)stmt->dec_assign.var->id.len,
@@ -271,6 +281,9 @@ void printOp(TACOp op) {
             break;
         case OP_CALL:
             printf("call");
+            break;
+        case OP_RETURN:
+            printf("return");
             break;
     }
 }

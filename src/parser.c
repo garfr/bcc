@@ -49,6 +49,7 @@ enum TokTypeBits {
     TOK_LET_BITS = 1 << 5,
     TOK_ARROW_BITS = 1 << 6,
     TOK_LPAREN_BITS = 1 << 7,
+    TOK_RETURN_BITS = 1 << 8,
 };
 
 /* Runs through tokens until a token passed in bitflags is reached, which is
@@ -462,19 +463,47 @@ Stmt *parseAssignment(Parser *parser, Token symTok) {
     return ret;
 }
 
+Stmt *parseReturn(Parser *parser, Token firstTok) {
+    Token semiTok = peekToken(parser->lex);
+    if (semiTok.type == TOK_SEMICOLON) {
+        Stmt *stmt =
+            stmtFromTwoPoints(firstTok.start, semiTok.end, STMT_RETURN);
+        stmt->returnExp = NULL;
+        nextToken(parser->lex);
+        return stmt;
+    }
+
+    Expr *returnExp = parseExpr(parser);
+
+    semiTok = nextToken(parser->lex);
+    if (semiTok.type != TOK_SEMICOLON) {
+        queueError("Expected ';' after return statment", semiTok.start,
+                   semiTok.end);
+        semiTok = continueUntil(parser->lex, TOK_SEMICOLON_BITS);
+    }
+
+    Stmt *stmt = stmtFromTwoPoints(firstTok.start, returnExp->end, STMT_RETURN);
+    stmt->returnExp = returnExp;
+    return stmt;
+}
+
 Stmt *parseStmt(Parser *parser) {
     Token tok = nextToken(parser->lex);
 
-    if (tok.type != TOK_LET && tok.type != TOK_MUT && tok.type != TOK_SYM) {
-        queueError(msprintf("Expeted 'var' or a symbol to begin a statement"),
+    if (tok.type != TOK_LET && tok.type != TOK_MUT && tok.type != TOK_SYM &&
+        tok.type != TOK_RETURN) {
+        queueError(msprintf("Expected 'var' or a symbol to begin a statement"),
                    tok.start, tok.end);
-        tok = continueUntil(parser->lex, TOK_LET_BITS | TOK_SYM_BITS);
+        tok = continueUntil(parser->lex,
+                            TOK_LET_BITS | TOK_SYM_BITS | TOK_RETURN_BITS);
     }
     switch (tok.type) {
         case TOK_LET:
             return parseDec(parser, tok, false);
         case TOK_MUT:
             return parseDec(parser, tok, true);
+        case TOK_RETURN:
+            return parseReturn(parser, tok);
         case TOK_SYM:
             return parseAssignment(parser, tok);
         default:
@@ -532,7 +561,7 @@ Vector *parseParams(Scope *scope, Parser *parser) {
     }
 }
 
-Function *parseFunction(Parser *parser) {
+Function *parseFunction(Parser *parser, Token keywordTok) {
     Token symTok = nextToken(parser->lex);
 
     if (symTok.type != TOK_SYM) {
@@ -578,10 +607,11 @@ Function *parseFunction(Parser *parser) {
 
     Vector *stmts = newVector(sizeof(Stmt *), 0);
 
+    Token endTok;
     for (;;) {
         Token tok = peekToken(parser->lex);
         if (tok.type == TOK_END) {
-            nextToken(parser->lex);
+            endTok = nextToken(parser->lex);
             break;
         }
         Stmt *stmt = parseStmt(parser);
@@ -594,6 +624,8 @@ Function *parseFunction(Parser *parser) {
     fun->retType = retType;
     fun->scope = parser->currentScope;
     fun->stmts = stmts;
+    fun->start = keywordTok.start;
+    fun->end = endTok.end;
 
     return fun;
 }
@@ -602,7 +634,8 @@ Toplevel parseToplevel(Parser *parser) {
     Token keywordTok = nextToken(parser->lex);
     switch (keywordTok.type) {
         case TOK_PROC:
-            return (Toplevel){.type = TOP_PROC, .fn = parseFunction(parser)};
+            return (Toplevel){.type = TOP_PROC,
+                              .fn = parseFunction(parser, keywordTok)};
         default:
             printToken(keywordTok);
             printf("Internal compiler error: No global vars yet.\n");

@@ -25,6 +25,7 @@ typedef enum {
 
     OP_GETPARAM,
     OP_ADDPARAM,
+    OP_RETURN,
     OP_CALL,
 } TACOp;
 

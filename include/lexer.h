@@ -20,6 +20,7 @@ enum TokenType {
     TOK_PROC,
     TOK_MUT,
     TOK_END,
+    TOK_RETURN,
     TOK_VOID,
 
     /* Symbols, and other values */

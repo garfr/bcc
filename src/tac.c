@@ -135,6 +135,19 @@ void convertStmt(TAC* tac, Stmt* stmt) {
             dest.type = ADDR_VAR;
             dest.var = stmt->dec_assign.var;
             addCopy(dest, value, tac);
+        } break;
+        case STMT_RETURN: {
+            TACInst* retInst = newInstruction(OP_RETURN);
+            retInst->op.args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
+            retInst->op.args[2] = (TACAddr){.type = ADDR_EMPTY, {}};
+
+            if (stmt->returnExp != NULL) {
+                TACAddr expr = convertExpr(tac, stmt->returnExp);
+                retInst->op.args[0] = expr;
+            } else {
+                retInst->op.args[0] = (TACAddr){.type = ADDR_EMPTY, {}};
+            }
+            pushVector(tac->codes, &retInst);
         }
     }
 }

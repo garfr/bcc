@@ -228,8 +228,9 @@ void typeExpression(Scope* scope, Expr* exp) {
 }
 
 /* Adds type information to a statment, including inserting any needed
- * information into the symbol table */
-void typeStmt(Scope* scope, Stmt* stmt) {
+ * information into the symbol table
+ * Returns whether the stmt was a properly typed return statment */
+bool typeStmt(Scope* scope, Stmt* stmt, Type* returnType) {
     assert(scope != NULL);
     assert(stmt != NULL);
 
@@ -273,7 +274,37 @@ void typeStmt(Scope* scope, Stmt* stmt) {
             TypedEntry* entry = stmt->dec_assign.var->data;
             entry->type = type;
         } break;
-
+        case STMT_RETURN: {
+            if (stmt->returnExp != NULL) {
+                typeExpression(scope, stmt->returnExp);
+                /* If the user wants to return a function call that has type
+                 * void */
+                if (stmt->returnExp->typeExpr->type == TYP_VOID &&
+                    returnType->type == TYP_VOID) {
+                    return true;
+                }
+                if (coerceAssignment(returnType, stmt->returnExp->typeExpr) ==
+                    NULL) {
+                    queueError(msprintf("Cannot return type %s in a function "
+                                        "that returns %s",
+                                        stringOfType(stmt->returnExp->typeExpr),
+                                        stringOfType(returnType)),
+                               stmt->start, stmt->end);
+                    return false;
+                }
+                return true;
+            } else {
+                if (returnType->type == TYP_VOID) {
+                    return true;
+                } else {
+                    queueError(
+                        "Cannot return actual value in a function that returns "
+                        "void",
+                        stmt->start, stmt->end);
+                    return false;
+                }
+            }
+        } break;
         case STMT_ASSIGN: {
             typeExpression(scope, stmt->assign.value);
 
@@ -287,8 +318,9 @@ void typeStmt(Scope* scope, Stmt* stmt) {
                              stmt->assign.var->id.len,
                              stmt->assign.var->id.text),
                     stmt->start, stmt->end);
-                return;
+                return false;
             }
+
             Type* type =
                 coerceAssignment(entry->type, stmt->assign.value->typeExpr);
 
@@ -302,6 +334,7 @@ void typeStmt(Scope* scope, Stmt* stmt) {
             break;
         }
     }
+    return false;
 }
 
 void typeToplevel(Toplevel* top) {
@@ -311,13 +344,21 @@ void typeToplevel(Toplevel* top) {
                 "Internal compiler error: No global variable support yet.\n");
             exit(1);
         case TOP_PROC: {
+            bool returnsCorrectly = false;
             for (size_t i = 0; i < top->fn->stmts->numItems; i++) {
-                typeStmt(top->fn->scope,
-                         *((Stmt**)indexVector(top->fn->stmts, i)));
+                returnsCorrectly = typeStmt(
+                    top->fn->scope, *((Stmt**)indexVector(top->fn->stmts, i)),
+                    top->fn->retType);
+            }
+
+            if (!returnsCorrectly && top->fn->retType->type != TYP_VOID) {
+                queueError("Function never returns a correct type",
+                           top->fn->end, top->fn->end);
             }
         }
     }
 }
+
 void annotateAST(AST* ast) {
     for (size_t i = 0; i < ast->decs->numItems; i++) {
         typeToplevel(indexVector(ast->decs, i));
