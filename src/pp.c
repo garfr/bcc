@@ -27,6 +27,9 @@ void printToken(Token tok) {
         case TOK_PROC:
             printf("TOK_PROC");
             break;
+        case TOK_TYPE:
+            printf("TOK_TYPE");
+            break;
         case TOK_END:
             printf("TOK_END");
             break;
@@ -35,6 +38,9 @@ void printToken(Token tok) {
             break;
         case TOK_VOID:
             printf("TOK_VOID");
+            break;
+        case TOK_RECORD:
+            printf("TOK_RECORD");
             break;
         case TOK_SYM:
             printf("TOK_SYM: '%.*s'", (int)tok.sym.len, tok.sym.text);
@@ -96,6 +102,10 @@ void printType(Type *type) {
         case TYP_INTLIT:
             printf("TYP_INTLIT");
             break;
+        case TYP_BINDING:
+            printf("%.*s", (int)type->typeEntry->id.len,
+                   type->typeEntry->id.text);
+            break;
         case TYP_FUN: {
             printf("(");
             size_t i;
@@ -108,6 +118,10 @@ void printType(Type *type) {
             printType(type->fun.retType);
             break;
         }
+
+        case TYP_RECORD:
+            printf("record");
+            break;
     }
 }
 
@@ -176,6 +190,10 @@ void printStmt(Stmt *stmt) {
                 printf(": ");
                 printExpr(stmt->returnExp);
             }
+            break;
+        case STMT_EXPR:
+            printf("STMT_EXPR: ");
+            printExpr(stmt->singleExpr);
             break;
         case STMT_DEC_ASSIGN:
             printf(

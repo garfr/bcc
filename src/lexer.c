@@ -75,6 +75,10 @@ static Token makeSymbolBehind(Lexer *lex) {
         tok.type = TOK_VOID;
     } else if (compareSymbolStr(sym, "return") == 0) {
         tok.type = TOK_RETURN;
+    } else if (compareSymbolStr(sym, "type") == 0) {
+        tok.type = TOK_TYPE;
+    } else if (compareSymbolStr(sym, "record") == 0) {
+        tok.type = TOK_RECORD;
     } else {
         tok.sym = sym;
         tok.type = TOK_SYM;
@@ -205,6 +209,14 @@ Token nextToken(Lexer *lex) {
 Token peekToken(Lexer *lex) {
     Lexer old = *lex;
     Token ret = nextToken(lex);
+    *lex = old;
+    return ret;
+}
+
+Token lookaheadToken(Lexer *lex) {
+    Lexer old = *lex;
+    nextToken(lex);
+    Token ret = peekToken(lex);
     *lex = old;
     return ret;
 }

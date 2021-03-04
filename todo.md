@@ -5,19 +5,18 @@ The feature should have no glaring limitations within its scope, and should comp
 
 ## Todo
 
-* Make hashtbl typesafe
 * Unbreak error messages 
-* User defined types (this might be a bit weird and will probably require a design doc)
 
 ## In Progress 
 
-* Functions
+* User defined types
 
 ## Done
 
 * Basic structure of the compiler
 * Variable declarations and simple integer types
 * Single value assignment from both variables and integer literals
+* Functions
 * Type inference
 * Math
 * Mutability control
@@ -30,6 +29,7 @@ The feature should have no glaring limitations within its scope, and should comp
 | lexer.c   | Well organized, comments where needed                            |
 | parser.c  | Some comments, difficult to read                                 |
 | tac.c     | Very basic, with minimal comments (very few are needed)          |
+| types.c   | Very few comments, but organized well                            |
 | codegen.c | Besides being completely broken, reasonably well organized!      |
 | pp.c      | Good                                                             |
 | types.c   | Decent comments, big improvement over the mess that parser.c was |

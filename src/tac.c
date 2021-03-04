@@ -127,6 +127,10 @@ void convertStmt(TAC* tac, Stmt* stmt) {
             dest.var = stmt->assign.var;
             addCopy(dest, value, tac);
         } break;
+        case STMT_EXPR: {
+            convertExpr(tac, stmt->singleExpr);
+            break;
+        }
 
         case STMT_DEC_ASSIGN: {
             // This is the same as an assignment

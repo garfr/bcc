@@ -22,6 +22,8 @@ enum TokenType {
     TOK_END,
     TOK_RETURN,
     TOK_VOID,
+    TOK_RECORD,
+    TOK_TYPE,
 
     /* Symbols, and other values */
     TOK_SYM,
@@ -70,4 +72,5 @@ typedef struct {
 
 Lexer newLexer(const unsigned char *buffer, size_t bufferLen);
 Token nextToken(Lexer *lex);
+Token lookaheadToken(Lexer *lex);
 Token peekToken(Lexer *lex);

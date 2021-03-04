@@ -34,6 +34,7 @@
 typedef struct {
     Scope *currentScope;
     Lexer *lex;
+    Hashtbl *typeTable;
 } Parser;
 
 static Type *VoidType = &(Type){.type = TYP_VOID, {}};
@@ -160,14 +161,20 @@ Type *parseType(Parser *parser) {
                     ret->type = TYP_UINT;
                     ret->intsize = convertSymbolInt(tok);
                     return ret;
-                default:
-                    queueError(msprintf("Expected type to be a symbol with "
-                                        "first character 's' "
-                                        "and ending with a number, not '%.*s'",
-                                        tok.sym.len, tok.sym.text),
-                               tok.start, tok.end);
-                    printErrors();
-                    exit(1);
+                default: {
+                    HashEntry *entry = findHashtbl(parser->typeTable, tok.sym);
+                    if (entry == NULL) {
+                        queueError(
+                            msprintf("Could not find a type with name %.*s",
+                                     (int)tok.sym.len, tok.sym.text),
+                            tok.start, tok.end);
+                        printErrors();
+                    }
+                    ret = malloc(sizeof(Type));
+                    ret->type = TYP_BINDING;
+                    ret->typeEntry = entry;
+                    return ret;
+                }
             }
             break;
         case TOK_VOID:
@@ -177,6 +184,51 @@ Type *parseType(Parser *parser) {
             assert(false);
             return NULL;
     }
+}
+
+/* Includes all the above types, plus records and such */
+Type *parseComplexType(Parser *parser) {
+    Token firstTok = peekToken(parser->lex);
+
+    if (firstTok.type == TOK_RECORD) {
+        nextToken(parser->lex);
+        Vector *recordFields = newVector(sizeof(RecordField), 0);
+
+        while (peekToken(parser->lex).type != TOK_END) {
+            Token symTok = nextToken(parser->lex);
+            if (symTok.type != TOK_SYM) {
+                queueError("Expected name of record field", symTok.start,
+                           symTok.end);
+                symTok = continueUntil(parser->lex, TOK_SYM_BITS);
+            }
+            Token colonTok = nextToken(parser->lex);
+            if (colonTok.type != TOK_COLON) {
+                queueError("Expected ':' after name of record field",
+                           colonTok.start, colonTok.end);
+                colonTok = continueUntil(parser->lex, TOK_COLON_BITS);
+            }
+
+            Type *fieldType = parseType(parser);
+
+            Token commaToken = peekToken(parser->lex);
+            if (commaToken.type == TOK_COMMA) {
+                nextToken(parser->lex);
+            }
+
+            RecordField field =
+                (RecordField){.name = symTok.sym, .type = fieldType};
+            pushVector(recordFields, &field);
+        }
+
+        // Skip over the end token
+        nextToken(parser->lex);
+
+        Type *type = malloc(sizeof(Type));
+        type->type = TYP_RECORD;
+        type->recordFields = recordFields;
+        return type;
+    }
+    return parseType(parser);
 }
 
 Expr *parseExpr(Parser *parser);
@@ -488,27 +540,57 @@ Stmt *parseReturn(Parser *parser, Token firstTok) {
 }
 
 Stmt *parseStmt(Parser *parser) {
-    Token tok = nextToken(parser->lex);
+    Token tok = peekToken(parser->lex);
 
-    if (tok.type != TOK_LET && tok.type != TOK_MUT && tok.type != TOK_SYM &&
-        tok.type != TOK_RETURN) {
-        queueError(msprintf("Expected 'var' or a symbol to begin a statement"),
-                   tok.start, tok.end);
-        tok = continueUntil(parser->lex,
-                            TOK_LET_BITS | TOK_SYM_BITS | TOK_RETURN_BITS);
-    }
     switch (tok.type) {
         case TOK_LET:
+            nextToken(parser->lex);
             return parseDec(parser, tok, false);
         case TOK_MUT:
+            nextToken(parser->lex);
             return parseDec(parser, tok, true);
         case TOK_RETURN:
+            nextToken(parser->lex);
             return parseReturn(parser, tok);
-        case TOK_SYM:
-            return parseAssignment(parser, tok);
-        default:
-            /* Unreachable */
-            exit(1);
+        case TOK_SYM: {
+            Token equalsTok = lookaheadToken(parser->lex);
+            if (equalsTok.type == TOK_EQUAL) {
+                nextToken(parser->lex);
+                return parseAssignment(parser, tok);
+            } else {
+                Expr *expr = parseExpr(parser);
+                Token semiTok = nextToken(parser->lex);
+                if (semiTok.type != TOK_SEMICOLON) {
+                    queueError(
+                        "Expected ';' after expression parsed as a standalone "
+                        "statement",
+                        expr->start, semiTok.end);
+                    semiTok = continueUntil(parser->lex, TOK_SEMICOLON_BITS);
+                }
+
+                Stmt *exprStmt =
+                    stmtFromTwoPoints(expr->start, semiTok.end, STMT_EXPR);
+                exprStmt->singleExpr = expr;
+                return exprStmt;
+            }
+        }
+        default: {
+            Expr *expr = parseExpr(parser);
+
+            Token semiTok = nextToken(parser->lex);
+            if (semiTok.type != TOK_SEMICOLON) {
+                queueError(
+                    "Expected ';' after expression parsed as a standalone "
+                    "statement",
+                    expr->start, semiTok.end);
+                semiTok = continueUntil(parser->lex, TOK_SEMICOLON_BITS);
+            }
+
+            Stmt *exprStmt =
+                stmtFromTwoPoints(expr->start, semiTok.end, STMT_EXPR);
+            exprStmt->singleExpr = expr;
+            return exprStmt;
+        }
     }
 }
 
@@ -630,15 +712,42 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
     return fun;
 }
 
+void parseTypeDec(Parser *parser) {
+    Token symTok = nextToken(parser->lex);
+    if (symTok.type != TOK_SYM) {
+        queueError("Expected type name after 'type' keyword", symTok.start,
+                   symTok.end);
+        symTok = continueUntil(parser->lex, TOK_SYM_BITS);
+    }
+
+    Token equalsTok = nextToken(parser->lex);
+    if (equalsTok.type != TOK_EQUAL) {
+        queueError("Expected '=' after name in type declaration",
+                   equalsTok.start, equalsTok.end);
+        equalsTok = continueUntil(parser->lex, TOK_EQUAL_BITS);
+    }
+
+    Type *type = parseComplexType(parser);
+    HashEntry *entry = insertHashtbl(parser->typeTable, symTok.sym, type);
+    if (entry == NULL) {
+        queueError(msprintf("Cannot rebind name '%.*s' to a type",
+                            (int)symTok.sym.len, symTok.sym.text),
+                   symTok.start, symTok.end);
+    }
+}
+
 Toplevel parseToplevel(Parser *parser) {
     Token keywordTok = nextToken(parser->lex);
     switch (keywordTok.type) {
         case TOK_PROC:
             return (Toplevel){.type = TOP_PROC,
                               .fn = parseFunction(parser, keywordTok)};
+        case TOK_TYPE:
+            parseTypeDec(parser);
+            return parseToplevel(parser);
         default:
             printToken(keywordTok);
-            printf("Internal compiler error: No global vars yet.\n");
+            printf("Internal compiler error: No global vars yet. 1\n");
             exit(1);
     }
 }
@@ -649,6 +758,7 @@ static Parser newParser(Lexer *lex) {
     ret.currentScope = malloc(sizeof(Scope));
     ret.currentScope->upScope = NULL;
     ret.currentScope->vars = newHashtbl(SYM_TABLE_INIT_SIZE);
+    ret.typeTable = newHashtbl(0);
     return ret;
 }
 

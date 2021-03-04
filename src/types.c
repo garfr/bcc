@@ -38,16 +38,41 @@ char* stringOfType(Type* type) {
             return "void";
         case TYP_UINT:
             return msprintf("u%ld", type->intsize * 8);
+        case TYP_BINDING:
+            return msprintf("%.*s", (int)type->typeEntry->id.len,
+                            type->typeEntry->id.text);
+
         case TYP_INTLIT:
             return "integer literal";
         case TYP_FUN:
             return "function pointer";
+        case TYP_RECORD:
+            return "record";
     }
     return NULL;
 }
 
+Type* coerceBinop(int op, Type* type1, Type* type2);
+
+bool compareRecords(Vector* fields1, Vector* fields2) {
+    if (fields1->numItems != fields2->numItems) {
+        return false;
+    }
+    for (size_t i = 0; i < fields1->numItems; i++) {
+        RecordField firstField = *((RecordField*)indexVector(fields1, i));
+        RecordField secondField = *((RecordField*)indexVector(fields2, i));
+        if (!compareSymbol(firstField.name, secondField.name) ||
+            coerceBinop(BINOP_ADD, firstField.type, secondField.type) == NULL) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* Coerces a two types to a binary type
  * For assignment, use coerceAssignment */
+/* TODO: NOTE: THIS SUCKS ASS AND SHOULD BE BETTER BUT IDK MAN SOME TIMES IT BE
+ * LIKE THAT */
 Type* coerceBinop(int op, Type* type1, Type* type2) {
     assert(type1 != NULL);
     assert(type2 != NULL);
@@ -67,9 +92,13 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                                 return type1;
                             }
                             return NULL;
+                        case TYP_BINDING:
+                            return coerceBinop(op, type1,
+                                               type2->typeEntry->data);
                         case TYP_UINT:
                         case TYP_VOID:
                         case TYP_FUN:
+                        case TYP_RECORD:
                             return NULL;
                         case TYP_INTLIT:
                             return type1;
@@ -83,9 +112,13 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                             }
                             return NULL;
                         case TYP_SINT:
+                        case TYP_RECORD:
                         case TYP_FUN:
                         case TYP_VOID:
                             return NULL;
+                        case TYP_BINDING:
+                            return coerceBinop(op, type1,
+                                               type2->typeEntry->data);
                         case TYP_INTLIT:
                             return type1;
                     }
@@ -94,11 +127,15 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                     switch (type2->type) {
                         case TYP_SINT:
                         case TYP_UINT:
-                        case TYP_FUN:
                         case TYP_INTLIT:
                             return type1;
                         case TYP_VOID:
+                        case TYP_RECORD:
+                        case TYP_FUN:
                             return NULL;
+                        case TYP_BINDING:
+                            return coerceBinop(op, type1,
+                                               type2->typeEntry->data);
                     }
                     break;
                 case TYP_VOID:
@@ -110,9 +147,47 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                         case TYP_INTLIT:
                         case TYP_VOID:
                         case TYP_FUN:
+                        case TYP_RECORD:
                             return NULL;
+                        case TYP_BINDING:
+                            return coerceBinop(op, type1,
+                                               type2->typeEntry->data);
                     }
                     break;
+                case TYP_BINDING:
+                    switch (type2->type) {
+                        case TYP_SINT:
+                        case TYP_UINT:
+                        case TYP_RECORD:
+                        case TYP_INTLIT:
+                        case TYP_VOID:
+                        case TYP_FUN:
+                            return NULL;
+                        case TYP_BINDING:
+                            return coerceBinop(op, type1->typeEntry->data,
+                                               type2->typeEntry->data);
+                    }
+                    break;
+                case TYP_RECORD:
+                    switch (type2->type) {
+                        case TYP_SINT:
+                        case TYP_UINT:
+                        case TYP_INTLIT:
+                        case TYP_VOID:
+                        case TYP_FUN:
+                            return NULL;
+                        case TYP_BINDING:
+                            return coerceBinop(op, type1->typeEntry->data,
+                                               type2->typeEntry->data);
+                        case TYP_RECORD:
+                            if (type2->type == TYP_RECORD) {
+                                if (compareRecords(type1->recordFields,
+                                                   type2->recordFields)) {
+                                    return type1;
+                                }
+                            }
+                            return NULL;
+                    }
             }
             break;
     }
@@ -132,9 +207,12 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                 case TYP_UINT:
                 case TYP_VOID:
                 case TYP_FUN:
+                case TYP_RECORD:
                     return NULL;
                 case TYP_INTLIT:
                     return type1;
+                case TYP_BINDING:
+                    return coerceAssignment(type1, type2->typeEntry->data);
             }
             break;
         case TYP_UINT:
@@ -144,19 +222,48 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                         return type1;
                     }
                     return NULL;
+                case TYP_RECORD:
                 case TYP_SINT:
                 case TYP_FUN:
                 case TYP_VOID:
                     return NULL;
                 case TYP_INTLIT:
                     return type1;
+                case TYP_BINDING:
+                    return coerceAssignment(type1, type2->typeEntry->data);
+            }
+            break;
+        case TYP_BINDING:
+            switch (type2->type) {
+                case TYP_UINT:
+                case TYP_SINT:
+                case TYP_FUN:
+                case TYP_VOID:
+                case TYP_RECORD:
+                case TYP_INTLIT:
+                    return coerceAssignment(type1->typeEntry->data, type2);
+                case TYP_BINDING:
+
+                    return coerceAssignment(type1->typeEntry->data,
+                                            type2->typeEntry->data);
             }
             break;
         case TYP_VOID:
-        case TYP_INTLIT:
-        case TYP_FUN:
+            if (type2->type == TYP_BINDING) {
+                return coerceAssignment(type1, type2->typeEntry->data);
+            }
             /* An integer literal should not be on the left side of an
              * assignment */
+            return NULL;
+        case TYP_RECORD:
+            if (type2->type == TYP_RECORD) {
+                if (compareRecords(type1->recordFields, type2->recordFields)) {
+                    return type1;
+                }
+            }
+            return NULL;
+        case TYP_INTLIT:
+        case TYP_FUN:
             return NULL;
     }
     return NULL;
@@ -185,12 +292,12 @@ void typeExpression(Scope* scope, Expr* exp) {
                     Type* wantedType = *((Type**)indexVector(fun->fun.args, i));
                     if (coerceAssignment(wantedType, thisExp->typeExpr) ==
                         NULL) {
-                        queueError(
-                            msprintf(
-                                "Function expected expression of type %s, not "
-                                "but got %s",
-                                stringOfType(wantedType), thisExp->typeExpr),
-                            thisExp->start, thisExp->end);
+                        queueError(msprintf("Function expected expression "
+                                            "of type %s, not "
+                                            "but got %s",
+                                            stringOfType(wantedType),
+                                            thisExp->typeExpr),
+                                   thisExp->start, thisExp->end);
                     }
                 }
             }
@@ -237,6 +344,16 @@ bool typeStmt(Scope* scope, Stmt* stmt, Type* returnType) {
     switch (stmt->type) {
         /* This should have gotten typed before hand */
         case STMT_DEC:
+            break;
+        case STMT_EXPR:
+            typeExpression(scope, stmt->singleExpr);
+
+            if (stmt->singleExpr->typeExpr->type != TYP_VOID) {
+                queueError(
+                    "Cannot discard returned value from expression "
+                    "statement",
+                    stmt->start, stmt->end);
+            }
             break;
         case STMT_DEC_ASSIGN: {
             typeExpression(scope, stmt->dec_assign.value);
@@ -298,7 +415,8 @@ bool typeStmt(Scope* scope, Stmt* stmt, Type* returnType) {
                     return true;
                 } else {
                     queueError(
-                        "Cannot return actual value in a function that returns "
+                        "Cannot return actual value in a function that "
+                        "returns "
                         "void",
                         stmt->start, stmt->end);
                     return false;
@@ -341,7 +459,8 @@ void typeToplevel(Toplevel* top) {
     switch (top->type) {
         case TOP_VAR:
             printf(
-                "Internal compiler error: No global variable support yet.\n");
+                "Internal compiler error: No global variable support "
+                "yet.\n");
             exit(1);
         case TOP_PROC: {
             bool returnsCorrectly = false;

@@ -22,9 +22,12 @@ typedef struct Type {
     enum TypeType {
         TYP_SINT,
         TYP_UINT,
+        TYP_RECORD,
         TYP_VOID,
         TYP_INTLIT,
         TYP_FUN,
+        // A binding of a more complex type to a single name
+        TYP_BINDING,
     } type;
 
     union {
@@ -34,8 +37,15 @@ typedef struct Type {
             Vector *args;  // Types*
             struct Type *retType;
         } fun;
+        HashEntry *typeEntry;
+        Vector *recordFields;  // RecordField
     };
 } Type;
+
+typedef struct {
+    Symbol name;
+    Type *type;
+} RecordField;
 
 /* A variant enum representing an expression in the AST */
 typedef struct Expr {
@@ -67,7 +77,13 @@ typedef struct Stmt {
     size_t start;
     size_t end;
 
-    enum StmtType { STMT_DEC, STMT_DEC_ASSIGN, STMT_ASSIGN, STMT_RETURN } type;
+    enum StmtType {
+        STMT_DEC,
+        STMT_DEC_ASSIGN,
+        STMT_ASSIGN,
+        STMT_RETURN,
+        STMT_EXPR
+    } type;
 
     union {
         struct {
@@ -79,12 +95,14 @@ typedef struct Stmt {
             Type *type;
             Expr *value;
         } dec_assign;
+
         struct {
             HashEntry *var;
             Expr *value;
         } assign;
 
         Expr *returnExp;
+        Expr *singleExpr;
     };
 } Stmt;
 
