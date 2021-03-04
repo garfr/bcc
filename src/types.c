@@ -243,7 +243,6 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                 case TYP_INTLIT:
                     return coerceAssignment(type1->typeEntry->data, type2);
                 case TYP_BINDING:
-
                     return coerceAssignment(type1->typeEntry->data,
                                             type2->typeEntry->data);
             }

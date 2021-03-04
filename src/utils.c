@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===/
 
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,30 +52,30 @@ char *msprintf(const char *format, ...) {
 
 /* ------------------------------ Symbol ----------------------------------- */
 
-int compareSymbol(Symbol sym1, Symbol sym2) {
+bool compareSymbol(Symbol sym1, Symbol sym2) {
     if (sym1.len != sym2.len) {
-        return -1;
+        return false;
     }
     const char *castSym1 = (const char *)sym1.text;
     const char *castSym2 = (const char *)sym2.text;
     size_t length = sym1.len < sym2.len ? sym1.len : sym2.len;
-    return strncmp(castSym1, castSym2, length);
+    return strncmp(castSym1, castSym2, length) == 0;
 }
 
 /* Compares a Symbol to a null terminated string */
-int compareSymbolStr(Symbol sym, const char *str) {
+bool compareSymbolStr(Symbol sym, const char *str) {
     if (sym.len != strlen(str)) {
-        return -1;
+        return false;
     }
     size_t stringLength = strlen(str);
     /* Smallest size of the two, to make sure a buffer overrun doesn't occur */
     size_t length = sym.len < stringLength ? sym.len : stringLength;
     for (size_t i = 0; i < length && str[i] != '\0'; i++) {
         if (sym.text[i] != str[i]) {
-            return -1;
+            return false;
         }
     }
-    return 0;
+    return true;
 }
 
 /* ------------------------------ Hashtbl ---------------------------------- */
@@ -118,7 +119,7 @@ HashEntry *findOrInsertHashtbl(Hashtbl *tbl, Symbol sym, void *data) {
     /* Look for entry that already exists */
     for (HashEntry *entry = tbl->buckets[hash]; entry != NULL;
          entry = entry->next) {
-        if (compareSymbol(sym, entry->id) == 0) {
+        if (compareSymbol(sym, entry->id)) {
             return entry;
         }
     }
@@ -138,7 +139,7 @@ HashEntry *insertHashtbl(Hashtbl *tbl, Symbol sym, void *data) {
 
     for (HashEntry *entry = tbl->buckets[hash]; entry != NULL;
          entry = entry->next) {
-        if (compareSymbol(sym, entry->id) == 0) {
+        if (compareSymbol(sym, entry->id)) {
             /* If it already exists, return NULL, signaling failure to insert
              */
             return NULL;
@@ -160,7 +161,7 @@ HashEntry *findHashtbl(Hashtbl *tbl, Symbol sym) {
 
     for (HashEntry *entry = tbl->buckets[hash]; entry != NULL;
          entry = entry->next) {
-        if (compareSymbol(sym, entry->id) == 0) {
+        if (compareSymbol(sym, entry->id)) {
             return entry;
         }
     }

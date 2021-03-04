@@ -27,11 +27,10 @@ typedef struct {
     size_t len;
 } Symbol;
 
-/* Works the same way strcmp does */
-int compareSymbol(Symbol sym1, Symbol sym2);
+bool compareSymbol(Symbol sym1, Symbol sym2);
 
 /* Compares a Symbol to a null terminated string */
-int compareSymbolStr(Symbol sym, const char *str);
+bool compareSymbolStr(Symbol sym, const char *str);
 
 /* ------------------------------ Hashtbl ---------------------------------- */
 

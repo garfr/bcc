@@ -63,21 +63,21 @@ static Token makeSymbolBehind(Lexer *lex) {
     tok.end = lex->endIdx - 1;
     /* Check if it matches any keywords, this can be replaced with a table in
      * the future */
-    if (compareSymbolStr(sym, "let") == 0) {
+    if (compareSymbolStr(sym, "let")) {
         tok.type = TOK_LET;
-    } else if (compareSymbolStr(sym, "proc") == 0) {
+    } else if (compareSymbolStr(sym, "proc")) {
         tok.type = TOK_PROC;
-    } else if (compareSymbolStr(sym, "mut") == 0) {
+    } else if (compareSymbolStr(sym, "mut")) {
         tok.type = TOK_MUT;
-    } else if (compareSymbolStr(sym, "end") == 0) {
+    } else if (compareSymbolStr(sym, "end")) {
         tok.type = TOK_END;
-    } else if (compareSymbolStr(sym, "void") == 0) {
+    } else if (compareSymbolStr(sym, "void")) {
         tok.type = TOK_VOID;
-    } else if (compareSymbolStr(sym, "return") == 0) {
+    } else if (compareSymbolStr(sym, "return")) {
         tok.type = TOK_RETURN;
-    } else if (compareSymbolStr(sym, "type") == 0) {
+    } else if (compareSymbolStr(sym, "type")) {
         tok.type = TOK_TYPE;
-    } else if (compareSymbolStr(sym, "record") == 0) {
+    } else if (compareSymbolStr(sym, "record")) {
         tok.type = TOK_RECORD;
     } else {
         tok.sym = sym;
