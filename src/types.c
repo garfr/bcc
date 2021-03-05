@@ -54,16 +54,21 @@ char* stringOfType(Type* type) {
 
 Type* coerceBinop(int op, Type* type1, Type* type2);
 
-bool compareRecords(Vector* fields1, Vector* fields2) {
-    if (fields1->numItems != fields2->numItems) {
+bool compareRecords(Hashtbl* fields1, Hashtbl* fields2) {
+    if (fields1->numBuckets != fields2->numBuckets) {
         return false;
     }
-    for (size_t i = 0; i < fields1->numItems; i++) {
-        RecordField firstField = *((RecordField*)indexVector(fields1, i));
-        RecordField secondField = *((RecordField*)indexVector(fields2, i));
-        if (!compareSymbol(firstField.name, secondField.name) ||
-            coerceBinop(BINOP_ADD, firstField.type, secondField.type) == NULL) {
-            return false;
+    // Iterate through the hashtable, this is what C++ is for lol
+    for (size_t i = 0; i < fields1->numBuckets; i++) {
+        for (HashEntry* entry = fields1->buckets[i]; entry != NULL;
+             entry = entry->next) {
+            HashEntry* otherEntry = findHashtbl(fields2, entry->id);
+            if (otherEntry == NULL) {
+                return false;
+            }
+            if (coerceBinop(BINOP_ADD, entry->data, otherEntry->data) == NULL) {
+                return false;
+            }
         }
     }
     return true;
@@ -164,6 +169,10 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                         case TYP_FUN:
                             return NULL;
                         case TYP_BINDING:
+                            if (compareSymbol(type1->typeEntry->id,
+                                              type2->typeEntry->id)) {
+                                return type1;
+                            }
                             return coerceBinop(op, type1->typeEntry->data,
                                                type2->typeEntry->data);
                     }
@@ -330,6 +339,36 @@ void typeExpression(Scope* scope, Expr* exp) {
 
             exp->typeExpr = newType;
         } break;
+        case EXP_RECORDLIT: {
+            Type* type = (Type*)exp->reclit.type->data;
+            if (exp->reclit.fields->numBuckets !=
+                type->recordFields->numBuckets) {
+                queueError("Supplies too many or two few fields for the record",
+                           exp->start, exp->end);
+                printErrors();
+            }
+            for (size_t i = 0; i < exp->reclit.fields->numBuckets; i++) {
+                for (HashEntry* entry = exp->reclit.fields->buckets[i];
+                     entry != NULL; entry = entry->next) {
+                    typeExpression(scope, entry->data);
+                    HashEntry* otherEntry =
+                        findHashtbl(type->recordFields, entry->id);
+                    Expr* expr = (Expr*)entry->data;
+                    if (coerceAssignment(otherEntry->data, expr->typeExpr) ==
+                        NULL) {
+                        queueError(
+                            msprintf("Cannot coerce type %s to %s, which is "
+                                     "the type of record field %.*s",
+                                     stringOfType(expr->typeExpr),
+                                     stringOfType(otherEntry->data),
+                                     (int)entry->id.len, entry->id.text),
+                            expr->start, expr->end);
+                        printErrors();
+                    }
+                }
+            }
+            exp->typeExpr = exp->reclit.type->data;
+        }
     }
 }
 

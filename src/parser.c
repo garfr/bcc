@@ -192,7 +192,7 @@ Type *parseComplexType(Parser *parser) {
 
     if (firstTok.type == TOK_RECORD) {
         nextToken(parser->lex);
-        Vector *recordFields = newVector(sizeof(RecordField), 0);
+        Hashtbl *recordFields = newHashtbl(0);
 
         while (peekToken(parser->lex).type != TOK_END) {
             Token symTok = nextToken(parser->lex);
@@ -215,9 +215,11 @@ Type *parseComplexType(Parser *parser) {
                 nextToken(parser->lex);
             }
 
-            RecordField field =
-                (RecordField){.name = symTok.sym, .type = fieldType};
-            pushVector(recordFields, &field);
+            if (insertHashtbl(recordFields, symTok.sym, fieldType) == NULL) {
+                queueError(msprintf("Cannot redeclare record field '%.*s'",
+                                    (int)symTok.sym.len, symTok.sym.text),
+                           symTok.start, symTok.end);
+            }
         }
 
         // Skip over the end token
@@ -242,13 +244,6 @@ Expr *parseFuncall(Parser *parser, Token symTok) {
         printErrors();
     }
 
-    Token lparenTok = nextToken(parser->lex);
-    if (lparenTok.type != TOK_LPAREN) {
-        queueError("Expected '(' before function call parameters",
-                   lparenTok.start, lparenTok.end);
-        lparenTok = continueUntil(parser->lex, TOK_LPAREN_BITS);
-    }
-
     Vector *args = newVector(sizeof(Expr *), 0);
 
     while (peekToken(parser->lex).type != TOK_RPAREN) {
@@ -268,6 +263,54 @@ Expr *parseFuncall(Parser *parser, Token symTok) {
     return funcall;
 }
 
+Expr *parseRecordLit(Parser *parser, Token symTok) {
+    HashEntry *entry = findHashtbl(parser->typeTable, symTok.sym);
+
+    if (entry == NULL) {
+        queueError(msprintf("Could not find a type binding for name '%.*s'",
+                            (int)symTok.sym.len, symTok.sym.text),
+                   symTok.start, symTok.end);
+    }
+
+    Hashtbl *recordLitFields = newHashtbl(0);
+
+    while (peekToken(parser->lex).type != TOK_RBRACKET) {
+        Token symTok = nextToken(parser->lex);
+        if (symTok.type != TOK_SYM) {
+            queueError("Expected name of record field", symTok.start,
+                       symTok.end);
+            symTok = continueUntil(parser->lex, TOK_SYM_BITS);
+        }
+
+        Token equalsTok = nextToken(parser->lex);
+        if (equalsTok.type != TOK_EQUAL) {
+            queueError("Expected ':' after name of record field",
+                       equalsTok.start, equalsTok.end);
+            equalsTok = continueUntil(parser->lex, TOK_EQUAL_BITS);
+        }
+
+        Expr *fieldExpr = parseExpr(parser);
+
+        Token commaToken = peekToken(parser->lex);
+        if (commaToken.type == TOK_COMMA) {
+            nextToken(parser->lex);
+        }
+
+        if (insertHashtbl(recordLitFields, symTok.sym, fieldExpr) == NULL) {
+            queueError(msprintf("Duplicate field '%.*s' in record literal",
+                                (int)symTok.sym.len, symTok.sym.text),
+                       symTok.start, symTok.end);
+        }
+    }
+
+    Token rparenToken = nextToken(parser->lex);
+
+    Expr *ret = exprFromTwoPoints(symTok.start, rparenToken.end, EXP_RECORDLIT);
+    ret->reclit.fields = recordLitFields;
+    ret->reclit.type = entry;
+    return ret;
+}
+
 Expr *parsePrimary(Parser *parser) {
     Expr *ret;
 
@@ -280,24 +323,34 @@ Expr *parsePrimary(Parser *parser) {
             return ret;
         case TOK_SYM:
 
-            if (peekToken(parser->lex).type == TOK_LPAREN) {
-                return parseFuncall(parser, tok);
+            switch (peekToken(parser->lex).type) {
+                case TOK_LPAREN:
+                    nextToken(parser->lex);
+                    return parseFuncall(parser, tok);
+                case TOK_LBRACKET:
+                    nextToken(parser->lex);
+                    return parseRecordLit(parser, tok);
+
+                default:
+                    ret = exprFromToken(tok, EXP_VAR);
+
+                    HashEntry *entry =
+                        findInScope(parser->currentScope, tok.sym);
+                    if (entry == NULL) {
+                        queueError(
+                            msprintf("Cannot find variable: '%.*s' in any "
+                                     "scope. Must be undeclared",
+                                     tok.sym.len, (char *)tok.sym.text),
+                            tok.start, tok.end);
+                        /* Must fail */
+                        printErrors();
+                    }
+
+                    ret->var = entry;
+                    ret->typeExpr = NULL;
+                    return ret;
             }
 
-            ret = exprFromToken(tok, EXP_VAR);
-
-            HashEntry *entry = findInScope(parser->currentScope, tok.sym);
-            if (entry == NULL) {
-                queueError(msprintf("Cannot find variable: '%.*s' in any "
-                                    "scope. Must be undeclared",
-                                    tok.sym.len, (char *)tok.sym.text),
-                           tok.start, tok.end);
-                /* Must fail */
-                printErrors();
-            }
-            ret->var = entry;
-            ret->typeExpr = NULL;
-            return ret;
         default:
             queueError(msprintf("Expected an integer or variable name for "
                                 "expressions, not another token"),

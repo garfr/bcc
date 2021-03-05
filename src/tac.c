@@ -84,7 +84,7 @@ TACAddr convertExpr(TAC* tac, Expr* expr) {
             pushVector(tac->codes, &addInst);
             return newAddr;
         }
-        case EXP_FUNCALL:
+        case EXP_FUNCALL: {
             /* Push the parameters */
             for (size_t i = 0; i < expr->funcall.arguments->numItems; i++) {
                 TACAddr addr = convertExpr(
@@ -107,13 +107,16 @@ TACAddr convertExpr(TAC* tac, Expr* expr) {
             callInst->op.args[2] = ret;
             pushVector(tac->codes, &callInst);
             return ret;
+        }
+        case EXP_RECORDLIT: {
+            printf("Internal compiler error: cannot compile structs\n");
+            exit(1);
+        }
     }
     printf("Internal compiler error: Cant reach this point.\n");
     exit(1);
 }
 
-/* Very simpler conversion algorithm, will become more complex with compound
- * expressions, arrays, control structures, etc. */
 void convertStmt(TAC* tac, Stmt* stmt) {
     switch (stmt->type) {
         case STMT_DEC:
@@ -211,9 +214,9 @@ Vector* fixArithmetic(Vector* oldCodes) {
                         inst->op.args[0] = inst->op.args[2];
                         pushVector(newCodes, &inst);
                         break;
-                        default:
-                            pushVector(newCodes, &inst);
                     }
+                    default:
+                        pushVector(newCodes, &inst);
                 }
             }
         }

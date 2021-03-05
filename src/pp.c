@@ -60,6 +60,12 @@ void printToken(Token tok) {
         case TOK_RPAREN:
             printf("TOK_RPAREN");
             break;
+        case TOK_LBRACKET:
+            printf("TOK_LBRACKET");
+            break;
+        case TOK_RBRACKET:
+            printf("TOK_RBRACKET");
+            break;
         case TOK_COMMA:
             printf("TOK_COMMA");
             break;
@@ -169,6 +175,11 @@ void printExpr(Expr *exp) {
                 printExpr(*((Expr **)indexVector(exp->funcall.arguments, i)));
             }
             printf(")");
+            break;
+        }
+        case EXP_RECORDLIT: {
+            printf("EXP_RECORDLIT: %.*s literal", (int)exp->reclit.type->id.len,
+                   exp->reclit.type->id.text);
             break;
         }
     }

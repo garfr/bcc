@@ -38,21 +38,22 @@ typedef struct Type {
             struct Type *retType;
         } fun;
         HashEntry *typeEntry;
-        Vector *recordFields;  // RecordField
+        Hashtbl *recordFields;  // RecordField
     };
 } Type;
-
-typedef struct {
-    Symbol name;
-    Type *type;
-} RecordField;
 
 /* A variant enum representing an expression in the AST */
 typedef struct Expr {
     size_t start;
     size_t end;
 
-    enum ExprType { EXP_INT, EXP_VAR, EXP_BINOP, EXP_FUNCALL } type;
+    enum ExprType {
+        EXP_INT,
+        EXP_VAR,
+        EXP_BINOP,
+        EXP_FUNCALL,
+        EXP_RECORDLIT
+    } type;
 
     Type *typeExpr;
     union {
@@ -69,6 +70,11 @@ typedef struct Expr {
             HashEntry *name;
             Vector *arguments;  // Expr*
         } funcall;
+
+        struct {
+            HashEntry *type;
+            Hashtbl *fields;
+        } reclit;
     };
 } Expr;
 

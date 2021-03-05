@@ -38,6 +38,8 @@ enum TokenType {
     TOK_PLUS,
     TOK_LPAREN,
     TOK_RPAREN,
+    TOK_LBRACKET,
+    TOK_RBRACKET,
     TOK_MINUS,
     TOK_STAR,
     TOK_SLASH,

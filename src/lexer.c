@@ -153,6 +153,10 @@ Token nextToken(Lexer *lex) {
                         return makeTokenInplace(lex, TOK_RPAREN);
                     case ',':
                         return makeTokenInplace(lex, TOK_COMMA);
+                    case '{':
+                        return makeTokenInplace(lex, TOK_LBRACKET);
+                    case '}':
+                        return makeTokenInplace(lex, TOK_RBRACKET);
                     case '(':
                         return makeTokenInplace(lex, TOK_LPAREN);
                     case '/':
