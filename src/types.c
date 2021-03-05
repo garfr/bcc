@@ -341,8 +341,7 @@ void typeExpression(Scope* scope, Expr* exp) {
         } break;
         case EXP_RECORDLIT: {
             Type* type = (Type*)exp->reclit.type->data;
-            if (exp->reclit.fields->numBuckets !=
-                type->recordFields->numBuckets) {
+            if (exp->reclit.fields->entries != type->recordFields->entries) {
                 queueError("Supplies too many or two few fields for the record",
                            exp->start, exp->end);
                 printErrors();
@@ -351,18 +350,32 @@ void typeExpression(Scope* scope, Expr* exp) {
                 for (HashEntry* entry = exp->reclit.fields->buckets[i];
                      entry != NULL; entry = entry->next) {
                     typeExpression(scope, entry->data);
+
+                    Expr* tempExpr = (Expr*)entry->data;
+
                     HashEntry* otherEntry =
                         findHashtbl(type->recordFields, entry->id);
-                    Expr* expr = (Expr*)entry->data;
-                    if (coerceAssignment(otherEntry->data, expr->typeExpr) ==
-                        NULL) {
+
+                    if (otherEntry == NULL) {
                         queueError(
-                            msprintf("Cannot coerce type %s to %s, which is "
-                                     "the type of record field %.*s",
-                                     stringOfType(expr->typeExpr),
-                                     stringOfType(otherEntry->data),
-                                     (int)entry->id.len, entry->id.text),
-                            expr->start, expr->end);
+                            msprintf("No field '%.*s' in record type '%.*s'",
+                                     (int)entry->id.len, entry->id.text,
+                                     (int)exp->reclit.type->id.len,
+                                     exp->reclit.type->id.text),
+                            exp->start, exp->end);
+                        printErrors();
+                    }
+
+                    if (coerceAssignment(otherEntry->data,
+                                         tempExpr->typeExpr) == NULL) {
+                        queueError(
+                            msprintf(
+                                "Cannot coerce type '%s' to '%s', which is "
+                                "the type of record field '%.*s'",
+                                stringOfType(tempExpr->typeExpr),
+                                stringOfType(otherEntry->data),
+                                (int)entry->id.len, entry->id.text),
+                            tempExpr->start, tempExpr->end);
                         printErrors();
                     }
                 }
