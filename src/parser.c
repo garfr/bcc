@@ -51,6 +51,7 @@ enum TokTypeBits {
     TOK_ARROW_BITS = 1 << 6,
     TOK_LPAREN_BITS = 1 << 7,
     TOK_RETURN_BITS = 1 << 8,
+    TOK_PERIOD_BITS = 1 << 9,
 };
 
 /* Runs through tokens until a token passed in bitflags is reached, which is
@@ -80,7 +81,7 @@ Token continueUntil(Lexer *lex, int bitFlags) {
 /* Creates a new expression with the same position information as given
  * token */
 Expr *exprFromToken(Token tok, enum ExprType type) {
-    Expr *exp = malloc(sizeof(Expr));
+    Expr *exp = calloc(1, sizeof(Expr));
     exp->type = type;
     exp->start = tok.start;
     exp->end = tok.end;
@@ -88,7 +89,7 @@ Expr *exprFromToken(Token tok, enum ExprType type) {
 }
 
 Expr *exprFromTwoPoints(size_t start, size_t end, enum ExprType type) {
-    Expr *exp = malloc(sizeof(Expr));
+    Expr *exp = calloc(1, sizeof(Expr));
     exp->type = type;
     exp->start = start;
     exp->end = end;
@@ -96,7 +97,7 @@ Expr *exprFromTwoPoints(size_t start, size_t end, enum ExprType type) {
 }
 
 Stmt *stmtFromTwoPoints(size_t start, size_t end, enum StmtType type) {
-    Stmt *ret = malloc(sizeof(Stmt));
+    Stmt *ret = calloc(1, sizeof(Stmt));
     ret->start = start;
     ret->end = end;
     ret->type = type;
@@ -152,12 +153,12 @@ Type *parseType(Parser *parser) {
         case TOK_SYM:
             switch (tok.sym.text[0]) {
                 case 's':
-                    ret = malloc(sizeof(Type));
+                    ret = calloc(1, sizeof(Type));
                     ret->type = TYP_SINT;
                     ret->intsize = convertSymbolInt(tok);
                     return ret;
                 case 'u':
-                    ret = malloc(sizeof(Type));
+                    ret = calloc(1, sizeof(Type));
                     ret->type = TYP_UINT;
                     ret->intsize = convertSymbolInt(tok);
                     return ret;
@@ -170,7 +171,7 @@ Type *parseType(Parser *parser) {
                             tok.start, tok.end);
                         printErrors();
                     }
-                    ret = malloc(sizeof(Type));
+                    ret = calloc(1, sizeof(Type));
                     ret->type = TYP_BINDING;
                     ret->typeEntry = entry;
                     return ret;
@@ -225,7 +226,7 @@ Type *parseComplexType(Parser *parser) {
         // Skip over the end token
         nextToken(parser->lex);
 
-        Type *type = malloc(sizeof(Type));
+        Type *type = calloc(1, sizeof(Type));
         type->type = TYP_RECORD;
         type->recordFields = recordFields;
         return type;
@@ -253,7 +254,7 @@ Expr *parseFuncall(Parser *parser, Token symTok) {
 
     Token endTok = nextToken(parser->lex);
 
-    Expr *funcall = malloc(sizeof(Expr));
+    Expr *funcall = calloc(1, sizeof(Expr));
     funcall->type = EXP_FUNCALL;
     funcall->funcall.arguments = args;
     funcall->funcall.name = value;
@@ -275,6 +276,13 @@ Expr *parseRecordLit(Parser *parser, Token symTok) {
     Hashtbl *recordLitFields = newHashtbl(0);
 
     while (peekToken(parser->lex).type != TOK_RBRACKET) {
+        Token periodTok = nextToken(parser->lex);
+        if (periodTok.type != TOK_PERIOD) {
+            queueError("Expected '.' before name of record field",
+                       periodTok.start, periodTok.end);
+            periodTok = continueUntil(parser->lex, TOK_PERIOD_BITS);
+        }
+
         Token symTok = nextToken(parser->lex);
         if (symTok.type != TOK_SYM) {
             queueError("Expected name of record field", symTok.start,
@@ -666,7 +674,7 @@ Param parseParam(Scope *scope, Parser *parser) {
     if (commaType.type == TOK_COMMA) {
         nextToken(parser->lex);
     }
-    TypedEntry *entry = malloc(sizeof(TypedEntry));
+    TypedEntry *entry = calloc(1, sizeof(TypedEntry));
     entry->isMut = false;
     entry->type = type;
 
@@ -706,7 +714,7 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
     }
 
     /* Allocate a new scope for the function */
-    Scope *newScope = malloc(sizeof(Scope));
+    Scope *newScope = calloc(1, sizeof(Scope));
     newScope->upScope = parser->currentScope;
     newScope->vars = newHashtbl(0);
     parser->currentScope = newScope;
@@ -729,12 +737,12 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
         pushVector(paramTypes, &paramType);
     }
 
-    Type *functionType = malloc(sizeof(Type));
+    Type *functionType = calloc(1, sizeof(Type));
     functionType->type = TYP_FUN;
     functionType->fun.args = paramTypes;
     functionType->fun.retType = retType;
 
-    TypedEntry *funEntry = malloc(sizeof(TypedEntry));
+    TypedEntry *funEntry = calloc(1, sizeof(TypedEntry));
     funEntry->isMut = false;
     funEntry->type = functionType;
 
@@ -753,7 +761,7 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
         pushVector(stmts, &stmt);
     }
 
-    Function *fun = malloc(sizeof(Function));
+    Function *fun = calloc(1, sizeof(Function));
     fun->name = symTok.sym;
     fun->params = params;
     fun->retType = retType;
@@ -808,7 +816,7 @@ Toplevel parseToplevel(Parser *parser) {
 static Parser newParser(Lexer *lex) {
     Parser ret;
     ret.lex = lex;
-    ret.currentScope = malloc(sizeof(Scope));
+    ret.currentScope = calloc(1, sizeof(Scope));
     ret.currentScope->upScope = NULL;
     ret.currentScope->vars = newHashtbl(SYM_TABLE_INIT_SIZE);
     ret.typeTable = newHashtbl(0);
@@ -841,7 +849,7 @@ AST *parseSource(Lexer *lex) {
         }
     }
 done : {
-    AST *ret = malloc(sizeof(AST));
+    AST *ret = calloc(1, sizeof(AST));
     ret->decs = decs;
     ret->globalScope = getGlobalScope(parser.currentScope);
     return ret;

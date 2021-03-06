@@ -22,8 +22,8 @@
 #include <types.h>
 #include <utils.h>
 
-/* Don't malloc the same type every time when using integer literals, just point
- * to this */
+/* Don't allocate the same type every time when using integer literals, just
+ * point to this */
 static Type* IntegerLit = &(Type){.type = TYP_INTLIT, {}};
 
 /* This is only needed because the current error handling system does not allow

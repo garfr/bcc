@@ -33,7 +33,7 @@ static size_t roundup(size_t bottomValue) {
     return ret;
 }
 
-/* Sprintf but it malloc's memory! */
+/* Sprintf but it dynamically allocates memory */
 char *msprintf(const char *format, ...) {
     va_list args;
     va_start(args, format);
@@ -41,7 +41,7 @@ char *msprintf(const char *format, ...) {
     va_copy(args2, args);
 
     size_t memNeeded = vsnprintf(NULL, 0, format, args) + 1;
-    char *buffer = malloc(memNeeded * sizeof(char));
+    char *buffer = calloc(1, memNeeded * sizeof(char));
     if (buffer == NULL) {
         printf("Compiler internal error: Out of memory.\n");
         exit(1);
@@ -81,7 +81,7 @@ bool compareSymbolStr(Symbol sym, const char *str) {
 /* ------------------------------ Hashtbl ---------------------------------- */
 
 Hashtbl *newHashtbl(size_t initBuckets) {
-    Hashtbl *ret = malloc(sizeof(Hashtbl));
+    Hashtbl *ret = calloc(1, sizeof(Hashtbl));
     ret->numBuckets = roundup(initBuckets);
     ret->usedBuckets = ret->entries = 0;
     ret->buckets = calloc(ret->numBuckets, sizeof(HashEntry *));
@@ -148,7 +148,7 @@ HashEntry *insertHashtbl(Hashtbl *tbl, Symbol sym, void *data) {
 
     /* No entries exist, so just allocate a new one */
     HashEntry *oldEntry = tbl->buckets[hash];
-    HashEntry *newEntry = malloc(sizeof(HashEntry));
+    HashEntry *newEntry = calloc(1, sizeof(HashEntry));
     newEntry->id = sym;
     newEntry->data = data;
     newEntry->next = oldEntry;
@@ -171,7 +171,7 @@ HashEntry *findHashtbl(Hashtbl *tbl, Symbol sym) {
 /* ------------------------------ Vector ----------------------------------- */
 
 Vector *newVector(size_t itemSize, size_t initialSize) {
-    Vector *ret = malloc(sizeof(Vector));
+    Vector *ret = calloc(1, sizeof(Vector));
     ret->itemSize = itemSize;
     ret->itemCapacity = roundup(initialSize);
     ret->numItems = 0;

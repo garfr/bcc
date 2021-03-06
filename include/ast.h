@@ -134,6 +134,7 @@ typedef struct {
  * This will grow as more information is collected */
 typedef struct {
     Type *type;
+    int64_t stackOffset;
     bool isMut;
 } TypedEntry;
 
