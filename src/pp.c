@@ -54,6 +54,12 @@ void printToken(Token tok) {
         case TOK_SEMICOLON:
             printf("TOK_SEMICOLON");
             break;
+        case TOK_PERIOD:
+            printf("TOK_PERIOD");
+            break;
+        case TOK_DOUBLECOLON:
+            printf("TOK_DOUBLECOLON");
+            break;
         case TOK_LPAREN:
             printf("TOK_LPAREN");
             break;

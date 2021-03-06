@@ -31,11 +31,13 @@ enum TokenType {
 
     /* Punctuation */
     TOK_COLON,
+    TOK_DOUBLECOLON,
     TOK_SEMICOLON,
     TOK_COMMA,
     TOK_ARROW,
     TOK_EQUAL,
     TOK_PLUS,
+    TOK_PERIOD,
     TOK_LPAREN,
     TOK_RPAREN,
     TOK_LBRACKET,
@@ -62,7 +64,7 @@ typedef struct {
 
 } Token;
 
-enum LexerState { LEX_START, LEX_SYMBOL, LEX_INT, LEX_DASH };
+enum LexerState { LEX_START, LEX_SYMBOL, LEX_INT, LEX_DASH, LEX_COLON };
 
 typedef struct {
     const unsigned char *buffer;

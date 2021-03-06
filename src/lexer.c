@@ -139,14 +139,18 @@ Token nextToken(Lexer *lex) {
                         lex->endIdx++;
                         lex->state = LEX_DASH;
                         continue;
+                    case ':':
+                        lex->endIdx++;
+                        lex->state = LEX_COLON;
+                        continue;
                     case ';':
                         return makeTokenInplace(lex, TOK_SEMICOLON);
-                    case ':':
-                        return makeTokenInplace(lex, TOK_COLON);
                     case '=':
                         return makeTokenInplace(lex, TOK_EQUAL);
                     case '+':
                         return makeTokenInplace(lex, TOK_PLUS);
+                    case '.':
+                        return makeTokenInplace(lex, TOK_PERIOD);
                     case '*':
                         return makeTokenInplace(lex, TOK_STAR);
                     case ')':
@@ -180,6 +184,16 @@ Token nextToken(Lexer *lex) {
                     return makeTokenInplace(lex, TOK_ARROW);
                 }
                 return makeTokenBehind(lex, TOK_MINUS);
+            }
+            case LEX_COLON: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeTokenBehind(lex, TOK_COLON);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (c == ':') {
+                    return makeTokenInplace(lex, TOK_COLON);
+                }
+                return makeTokenBehind(lex, TOK_COLON);
             }
             case LEX_SYMBOL: {
                 if (lex->endIdx >= lex->bufferLen) {
