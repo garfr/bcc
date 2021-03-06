@@ -3,7 +3,7 @@ OBJ_DIR=objs
 SRC_DIR=src
 INCLUDE_DIR=include
 
-CFLAGS=-O0 -g -Wall -Werror -Wextra -I$(INCLUDE_DIR)
+CFLAGS=-O0 -g -Wall -Wextra -I$(INCLUDE_DIR)
 LDFLAGS= -g
 
 SRC_FILES=$(wildcard $(SRC_DIR)/*.c)

@@ -194,6 +194,7 @@ Type *parseComplexType(Parser *parser) {
     if (firstTok.type == TOK_RECORD) {
         nextToken(parser->lex);
         Hashtbl *recordFields = newHashtbl(0);
+        Vector *vec = newVector(sizeof(HashEntry *), 0);
 
         while (peekToken(parser->lex).type != TOK_END) {
             Token symTok = nextToken(parser->lex);
@@ -215,8 +216,12 @@ Type *parseComplexType(Parser *parser) {
             if (commaToken.type == TOK_COMMA) {
                 nextToken(parser->lex);
             }
+            HashEntry *entry =
+                insertHashtbl(recordFields, symTok.sym, fieldType);
 
-            if (insertHashtbl(recordFields, symTok.sym, fieldType) == NULL) {
+            pushVector(vec, &entry);
+
+            if (entry == NULL) {
                 queueError(msprintf("Cannot redeclare record field '%.*s'",
                                     (int)symTok.sym.len, symTok.sym.text),
                            symTok.start, symTok.end);
@@ -228,7 +233,8 @@ Type *parseComplexType(Parser *parser) {
 
         Type *type = calloc(1, sizeof(Type));
         type->type = TYP_RECORD;
-        type->recordFields = recordFields;
+        type->record.recordFields = recordFields;
+        type->record.vec = vec;
         return type;
     }
     return parseType(parser);

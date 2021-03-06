@@ -54,26 +54,6 @@ char* stringOfType(Type* type) {
 
 Type* coerceBinop(int op, Type* type1, Type* type2);
 
-bool compareRecords(Hashtbl* fields1, Hashtbl* fields2) {
-    if (fields1->numBuckets != fields2->numBuckets) {
-        return false;
-    }
-    // Iterate through the hashtable, this is what C++ is for lol
-    for (size_t i = 0; i < fields1->numBuckets; i++) {
-        for (HashEntry* entry = fields1->buckets[i]; entry != NULL;
-             entry = entry->next) {
-            HashEntry* otherEntry = findHashtbl(fields2, entry->id);
-            if (otherEntry == NULL) {
-                return false;
-            }
-            if (coerceBinop(BINOP_ADD, entry->data, otherEntry->data) == NULL) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
 /* Coerces a two types to a binary type
  * For assignment, use coerceAssignment */
 /* TODO: NOTE: THIS SUCKS ASS AND SHOULD BE BETTER BUT IDK MAN SOME TIMES IT BE
@@ -189,13 +169,10 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                             return coerceBinop(op, type1->typeEntry->data,
                                                type2->typeEntry->data);
                         case TYP_RECORD:
-                            if (type2->type == TYP_RECORD) {
-                                if (compareRecords(type1->recordFields,
-                                                   type2->recordFields)) {
-                                    return type1;
-                                }
-                            }
-                            return NULL;
+                            printf(
+                                "Internal compiler error: Cannot compare "
+                                "record types.\n");
+                            exit(1);
                     }
             }
             break;
@@ -252,8 +229,11 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                 case TYP_INTLIT:
                     return coerceAssignment(type1->typeEntry->data, type2);
                 case TYP_BINDING:
-                    return coerceAssignment(type1->typeEntry->data,
-                                            type2->typeEntry->data);
+                    if (compareSymbol(type1->typeEntry->id,
+                                      type2->typeEntry->id)) {
+                        return type1;
+                    }
+                    return NULL;
             }
             break;
         case TYP_VOID:
@@ -263,13 +243,9 @@ Type* coerceAssignment(Type* type1, Type* type2) {
             /* An integer literal should not be on the left side of an
              * assignment */
             return NULL;
-        case TYP_RECORD:
-            if (type2->type == TYP_RECORD) {
-                if (compareRecords(type1->recordFields, type2->recordFields)) {
-                    return type1;
-                }
-            }
-            return NULL;
+        case TYP_RECORD: {
+            exit(1);
+        }
         case TYP_INTLIT:
         case TYP_FUN:
             return NULL;
@@ -341,7 +317,8 @@ void typeExpression(Scope* scope, Expr* exp) {
         } break;
         case EXP_RECORDLIT: {
             Type* type = (Type*)exp->reclit.type->data;
-            if (exp->reclit.fields->entries != type->recordFields->entries) {
+            if (exp->reclit.fields->entries !=
+                type->record.recordFields->entries) {
                 queueError("Supplies too many or two few fields for the record",
                            exp->start, exp->end);
                 printErrors();
@@ -354,7 +331,7 @@ void typeExpression(Scope* scope, Expr* exp) {
                     Expr* tempExpr = (Expr*)entry->data;
 
                     HashEntry* otherEntry =
-                        findHashtbl(type->recordFields, entry->id);
+                        findHashtbl(type->record.recordFields, entry->id);
 
                     if (otherEntry == NULL) {
                         queueError(
@@ -380,22 +357,60 @@ void typeExpression(Scope* scope, Expr* exp) {
                     }
                 }
             }
-            exp->typeExpr = exp->reclit.type->data;
+            exp->typeExpr = malloc(sizeof(Type));
+            exp->typeExpr->type = TYP_BINDING;
+            exp->typeExpr->typeEntry = exp->reclit.type;
         }
+    }
+}
+
+/* Calculates the size of a type in bytes */
+int64_t calculateSize(Type* type) {
+    switch (type->type) {
+        case TYP_SINT:
+        case TYP_UINT:
+            return type->intsize;
+        case TYP_VOID:
+            return 0;
+        case TYP_FUN:
+            return 8;
+        case TYP_INTLIT:
+            printf(
+                "Internal compiler error: Cannot calculate size of integer "
+                "literal,\n");
+            exit(1);
+        case TYP_RECORD: {
+            int64_t size = 0;
+            for (size_t i = 0; i < type->record.vec->numItems; i++) {
+                HashEntry* entry =
+                    *((HashEntry**)indexVector(type->record.vec, i));
+                size += calculateSize((Type*)entry->data);
+            }
+            return size;
+        }
+        case TYP_BINDING:
+            return calculateSize(type->typeEntry->data);
+        default:
+            printf("Internal compiler error: What.\n");
+            exit(1);
     }
 }
 
 /* Adds type information to a statment, including inserting any needed
  * information into the symbol table
  * Returns whether the stmt was a properly typed return statment */
-bool typeStmt(Scope* scope, Stmt* stmt, Type* returnType) {
+bool typeStmt(Scope* scope, Stmt* stmt, Type* returnType, int64_t* stackSpace) {
     assert(scope != NULL);
     assert(stmt != NULL);
 
     switch (stmt->type) {
         /* This should have gotten typed before hand */
-        case STMT_DEC:
-            break;
+        case STMT_DEC: {
+            TypedEntry* entry = stmt->dec.var->data;
+            entry->stackOffset = *stackSpace;
+            *stackSpace += calculateSize(entry->type);
+        } break;
+
         case STMT_EXPR:
             typeExpression(scope, stmt->singleExpr);
 
@@ -441,6 +456,8 @@ bool typeStmt(Scope* scope, Stmt* stmt, Type* returnType) {
 
             TypedEntry* entry = stmt->dec_assign.var->data;
             entry->type = type;
+            entry->stackOffset = *stackSpace;
+            *stackSpace += calculateSize(entry->type);
         } break;
         case STMT_RETURN: {
             if (stmt->returnExp != NULL) {
@@ -515,10 +532,11 @@ void typeToplevel(Toplevel* top) {
             exit(1);
         case TOP_PROC: {
             bool returnsCorrectly = false;
+            int64_t stackSize = 0;
             for (size_t i = 0; i < top->fn->stmts->numItems; i++) {
                 returnsCorrectly = typeStmt(
                     top->fn->scope, *((Stmt**)indexVector(top->fn->stmts, i)),
-                    top->fn->retType);
+                    top->fn->retType, &stackSize);
             }
 
             if (!returnsCorrectly && top->fn->retType->type != TYP_VOID) {

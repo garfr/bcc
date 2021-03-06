@@ -38,7 +38,10 @@ typedef struct Type {
             struct Type *retType;
         } fun;
         HashEntry *typeEntry;
-        Hashtbl *recordFields;  // RecordField
+        struct {
+            Hashtbl *recordFields;  // RecordField
+            Vector *vec;  // A linear list of HashEntries, that represents the
+        } record;
     };
 } Type;
 
