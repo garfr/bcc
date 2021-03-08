@@ -72,6 +72,8 @@ TACAddr convertExpr(TAC* tac, Expr* expr) {
             return (TACAddr){.type = ADDR_INTLIT, .intlit = expr->intlit};
         case EXP_VAR:
             return (TACAddr){.type = ADDR_VAR, .var = expr->var};
+        case EXP_BOOL:
+            return (TACAddr){.type = ADDR_BOOL, .boolean = expr->boolean};
         case EXP_BINOP: {
             TACAddr addr1 = convertExpr(tac, expr->binop.exp1);
             TACAddr addr2 = convertExpr(tac, expr->binop.exp2);

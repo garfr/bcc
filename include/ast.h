@@ -26,6 +26,7 @@ typedef struct Type {
         TYP_VOID,
         TYP_INTLIT,
         TYP_FUN,
+        TYP_BOOL,
         // A binding of a more complex type to a single name
         TYP_BINDING,
     } type;
@@ -55,6 +56,7 @@ typedef struct Expr {
         EXP_VAR,
         EXP_BINOP,
         EXP_FUNCALL,
+        EXP_BOOL,
         EXP_RECORDLIT
     } type;
 
@@ -63,6 +65,7 @@ typedef struct Expr {
         HashEntry *var;
         Symbol intlit;
 
+        bool boolean;
         struct {
             struct Expr *exp1;
             struct Expr *exp2;

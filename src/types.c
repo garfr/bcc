@@ -25,6 +25,7 @@
 /* Don't allocate the same type every time when using integer literals, just
  * point to this */
 static Type* IntegerLit = &(Type){.type = TYP_INTLIT, {}};
+static Type* BooleanLit = &(Type){.type = TYP_BOOL, {}};
 
 /* This is only needed because the current error handling system does not allow
  * you to just pass a type and have the error printer call printType This means
@@ -38,6 +39,8 @@ char* stringOfType(Type* type) {
             return "void";
         case TYP_UINT:
             return msprintf("u%ld", type->intsize * 8);
+        case TYP_BOOL:
+            return "bool";
         case TYP_BINDING:
             return msprintf("%.*s", (int)type->typeEntry->id.len,
                             type->typeEntry->id.text);
@@ -83,6 +86,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                         case TYP_UINT:
                         case TYP_VOID:
                         case TYP_FUN:
+                        case TYP_BOOL:
                         case TYP_RECORD:
                             return NULL;
                         case TYP_INTLIT:
@@ -100,6 +104,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                         case TYP_RECORD:
                         case TYP_FUN:
                         case TYP_VOID:
+                        case TYP_BOOL:
                             return NULL;
                         case TYP_BINDING:
                             return coerceBinop(op, type1,
@@ -115,6 +120,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                         case TYP_INTLIT:
                             return type1;
                         case TYP_VOID:
+                        case TYP_BOOL:
                         case TYP_RECORD:
                         case TYP_FUN:
                             return NULL;
@@ -129,6 +135,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                     switch (type2->type) {
                         case TYP_SINT:
                         case TYP_UINT:
+                        case TYP_BOOL:
                         case TYP_INTLIT:
                         case TYP_VOID:
                         case TYP_FUN:
@@ -145,6 +152,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                         case TYP_UINT:
                         case TYP_RECORD:
                         case TYP_INTLIT:
+                        case TYP_BOOL:
                         case TYP_VOID:
                         case TYP_FUN:
                             return NULL;
@@ -159,6 +167,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                     break;
                 case TYP_RECORD:
                     switch (type2->type) {
+                        case TYP_BOOL:
                         case TYP_SINT:
                         case TYP_UINT:
                         case TYP_INTLIT:
@@ -173,6 +182,17 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
                                 "Internal compiler error: Cannot compare "
                                 "record types.\n");
                             exit(1);
+                    }
+                    break;
+                case TYP_BOOL:
+                    switch (type2->type) {
+                        case TYP_BOOL:
+                            return type1;
+                        case TYP_BINDING:
+                            return coerceBinop(op, type1,
+                                               type2->typeEntry->data);
+                        default:
+                            return NULL;
                     }
             }
             break;
@@ -192,6 +212,7 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                     return NULL;
                 case TYP_UINT:
                 case TYP_VOID:
+                case TYP_BOOL:
                 case TYP_FUN:
                 case TYP_RECORD:
                     return NULL;
@@ -211,6 +232,7 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                 case TYP_RECORD:
                 case TYP_SINT:
                 case TYP_FUN:
+                case TYP_BOOL:
                 case TYP_VOID:
                     return NULL;
                 case TYP_INTLIT:
@@ -225,6 +247,7 @@ Type* coerceAssignment(Type* type1, Type* type2) {
                 case TYP_SINT:
                 case TYP_FUN:
                 case TYP_VOID:
+                case TYP_BOOL:
                 case TYP_RECORD:
                 case TYP_INTLIT:
                     return coerceAssignment(type1->typeEntry->data, type2);
@@ -240,12 +263,19 @@ Type* coerceAssignment(Type* type1, Type* type2) {
             if (type2->type == TYP_BINDING) {
                 return coerceAssignment(type1, type2->typeEntry->data);
             }
-            /* An integer literal should not be on the left side of an
-             * assignment */
             return NULL;
         case TYP_RECORD: {
             exit(1);
         }
+        case TYP_BOOL:
+            switch (type2->type) {
+                case TYP_BOOL:
+                    return type1;
+                case TYP_BINDING:
+                    return coerceAssignment(type1, type2->typeEntry->data);
+                default:
+                    return NULL;
+            }
         case TYP_INTLIT:
         case TYP_FUN:
             return NULL;
@@ -288,7 +318,9 @@ void typeExpression(Scope* scope, Expr* exp) {
         } break;
         case EXP_INT:
             exp->typeExpr = IntegerLit;
-            exp->typeExpr->type = TYP_INTLIT;
+            break;
+        case EXP_BOOL:
+            exp->typeExpr = BooleanLit;
             break;
         case EXP_VAR: {
             TypedEntry* entry = (TypedEntry*)exp->var->data;
@@ -390,10 +422,13 @@ int64_t calculateSize(Type* type) {
         }
         case TYP_BINDING:
             return calculateSize(type->typeEntry->data);
-        default:
-            printf("Internal compiler error: What.\n");
-            exit(1);
+        case TYP_BOOL:
+            return 1;
     }
+    printf(
+        "Internal compiler error: Reached end of calculateSize without "
+        "returning.\n");
+    exit(1);
 }
 
 /* Adds type information to a statment, including inserting any needed

@@ -364,8 +364,20 @@ Expr *parsePrimary(Parser *parser) {
                     ret->typeExpr = NULL;
                     return ret;
             }
+        case TOK_FALSE:
+            ret = exprFromToken(tok, EXP_BOOL);
+            ret->boolean = false;
+            ret->typeExpr = NULL;
+            return ret;
+        case TOK_TRUE:
+            ret = exprFromToken(tok, EXP_BOOL);
+            ret->boolean = true;
+            ret->typeExpr = NULL;
+            return ret;
 
         default:
+            printToken(tok);
+            printToken(nextToken(parser->lex));
             queueError(msprintf("Expected an integer or variable name for "
                                 "expressions, not another token"),
                        tok.start, tok.end);
@@ -432,132 +444,124 @@ Expr *parseTerm(Parser *parser) {
 
 Expr *parseExpr(Parser *parser) { return parseTerm(parser); }
 
-static Stmt *parseDec(Parser *parser, Token varTok, bool isMut) {
-    Stmt *retStmt;
-    Token nameTok = nextToken(parser->lex);
-    if (nameTok.type != TOK_SYM) {
-        queueError(msprintf("Expected variable name after keyword 'var'"),
-                   nameTok.start, nameTok.end);
-        nameTok = continueUntil(parser->lex, TOK_SYM_BITS);
-    }
-
-    /* Expect a colon or an equals size */
-    Token colonEqualTok = peekToken(parser->lex);
-    if (colonEqualTok.type != TOK_COLON && colonEqualTok.type != TOK_EQUAL) {
-        queueError(
-            msprintf("Expected ':' or '=' after variable name and before "
-                     "variable type in variable declaration, not "),
-            colonEqualTok.start, colonEqualTok.end);
-        colonEqualTok =
-            continueUntil(parser->lex, TOK_COLON_BITS | TOK_EQUAL_BITS);
-    }
-
+static Stmt *parseDec(Parser *parser, Token nameTok, bool isMut) {
     Type *type;
 
-    switch (colonEqualTok.type) {
-        case TOK_COLON:
-            nextToken(parser->lex);
-            type = parseType(parser);
-            if (type == VoidType) {
-                queueError("Cannot declare a variable with type void",
-                           nameTok.start, nameTok.end);
-                printErrors();
-            }
-            break;
-        case TOK_EQUAL:
-            /* The type will be inferred by the following expression */
-            type = NULL;
-            break;
-        default:
-            // This is unreachable, given the if statement above
-            exit(1);
-    }
+    type = parseType(parser);
+
+    Token prev = parser->lex->previousTok;
 
     /* Should either be a semicolon or an equals sign */
-    Token semicolonOrEqual = nextToken(parser->lex);
+    Token equalTok = nextToken(parser->lex);
 
-    if (semicolonOrEqual.type != TOK_SEMICOLON &&
-        semicolonOrEqual.type != TOK_EQUAL) {
-        printToken(semicolonOrEqual);
-        queueError(msprintf("Expected '=' or ';' after declaring the "
-                            "type and name of a variable"),
-                   semicolonOrEqual.start, semicolonOrEqual.end);
-        semicolonOrEqual =
-            continueUntil(parser->lex, TOK_SEMICOLON_BITS | TOK_EQUAL_BITS);
-    }
+    if (equalTok.type == TOK_EQUAL) {
+        Expr *exp = parseExpr(parser);
 
-    switch (semicolonOrEqual.type) {
-        /* Just a variable declaration */
-        case TOK_SEMICOLON:
-            if (type == NULL) {
-                queueError("Cannot infer type when no value is given",
-                           varTok.start, semicolonOrEqual.end);
-                printErrors();
-            }
-            retStmt =
-                stmtFromTwoPoints(varTok.start, semicolonOrEqual.end, STMT_DEC);
+        prev = parser->lex->previousTok;
 
-            HashEntry *entry =
-                addToScope(parser->currentScope, nameTok.sym, isMut);
+        Token endingTok = nextToken(parser->lex);
+        Stmt *stmt;
 
-            if (entry == NULL) {
-                queueError(msprintf("Cannot redeclare variable: '%.*s' in "
-                                    "the same scope",
-                                    nameTok.sym.len, (char *)nameTok.sym.text),
-                           retStmt->start, retStmt->end);
-                /* Must fail */
-                printErrors();
-            }
-
-            retStmt->dec.var = entry;
-            return retStmt;
-
-        /* Compound variable declaration and assignment */
-        case TOK_EQUAL: {
-            Expr *exp = parseExpr(parser);
-
-            Token semicolonTok = nextToken(parser->lex);
-            if (semicolonTok.type != TOK_SEMICOLON) {
-                queueError(msprintf("Expected ';' after expression.\n"),
-                           semicolonTok.start, semicolonTok.end);
-                printErrors();
-                exit(1);
-            }
-            Stmt *stmt = stmtFromTwoPoints(varTok.start, semicolonTok.end,
-                                           STMT_DEC_ASSIGN);
-
-            HashEntry *entry =
-                addToScope(parser->currentScope, nameTok.sym, isMut);
-
-            if (entry == NULL) {
-                printf("ERROR COCCURED\n");
-                queueError(msprintf("Cannot redeclare variable: '%.*s' in "
-                                    "the same scope",
-                                    nameTok.sym.len, (char *)nameTok.sym.text),
-                           stmt->start, stmt->end);
-                /* Must fail */
-                printErrors();
-                exit(1);
-            }
-
-            stmt->dec_assign.type = type;
-            stmt->dec_assign.var = entry;
-            stmt->dec_assign.value = exp;
-            return stmt;
-            default:
-                /* Unreachable */
-                exit(1);
+        if (endingTok.type == TOK_SEMICOLON) {
+            stmt = stmtFromTwoPoints(nameTok.start, endingTok.end,
+                                     STMT_DEC_ASSIGN);
+        } else if (endingTok.type == TOK_NEWLINE) {
+            stmt = stmtFromTwoPoints(nameTok.start, prev.end, STMT_DEC_ASSIGN);
+        } else {
+            queueError(
+                "Expected ';', '=', or newline after type in a variable "
+                "declaration",
+                endingTok.start, endingTok.end);
+            printErrors();
+            exit(1);
         }
+
+        HashEntry *entry = addToScope(parser->currentScope, nameTok.sym, isMut);
+
+        if (entry == NULL) {
+            queueError(msprintf("Cannot redeclare variable: '%.*s' in "
+                                "the same scope",
+                                nameTok.sym.len, (char *)nameTok.sym.text),
+                       stmt->start, stmt->end);
+            /* Must fail */
+            printErrors();
+            exit(1);
+        }
+
+        stmt->dec_assign.type = type;
+        stmt->dec_assign.var = entry;
+        stmt->dec_assign.value = exp;
+        return stmt;
     }
+
+    Stmt *stmt;
+    if (equalTok.type == TOK_SEMICOLON) {
+        stmt = stmtFromTwoPoints(nameTok.start, equalTok.end, STMT_DEC);
+    } else if (equalTok.type == TOK_NEWLINE) {
+        stmt = stmtFromTwoPoints(nameTok.start, prev.end, STMT_DEC);
+    } else {
+        queueError(
+            "Expected ';', '=', or newline after type in a variable "
+            "declaration",
+            nameTok.start, equalTok.end);
+        printErrors();
+        exit(1);
+    }
+
+    stmt = stmtFromTwoPoints(nameTok.start, prev.end, STMT_DEC);
+
+    HashEntry *entry = addToScope(parser->currentScope, nameTok.sym, isMut);
+
+    if (entry == NULL) {
+        queueError(msprintf("Cannot redeclare variable: '%.*s' in "
+                            "the same scope",
+                            nameTok.sym.len, (char *)nameTok.sym.text),
+                   nameTok.start, nameTok.end);
+        /* Must fail */
+        printErrors();
+    }
+
+    stmt->dec.var = entry;
+    return stmt;
+}
+
+Stmt *parseInferredDec(Parser *parser, Token varTok, bool isMut) {
+    Expr *value = parseExpr(parser);
+
+    Stmt *stmt;
+
+    Token semicolonTok = nextToken(parser->lex);
+    if (semicolonTok.type == TOK_SEMICOLON) {
+        stmt =
+            stmtFromTwoPoints(varTok.start, semicolonTok.end, STMT_DEC_ASSIGN);
+    } else if (semicolonTok.type == TOK_NEWLINE) {
+        stmt = stmtFromTwoPoints(varTok.start, value->end, STMT_DEC_ASSIGN);
+    } else {
+        queueError(
+            "Expected ';' or newline after expression in inferred declaration",
+            varTok.start, value->end);
+        stmt = stmtFromTwoPoints(varTok.start, value->end, STMT_DEC_ASSIGN);
+    }
+
+    stmt->dec_assign.type = NULL;
+    stmt->dec_assign.value = value;
+
+    HashEntry *entry = addToScope(parser->currentScope, varTok.sym, isMut);
+
+    if (entry == NULL) {
+        queueError(
+            msprintf("Cannot redeclare variable: '%.*s' in the same scope",
+                     (int)varTok.sym.len, varTok.sym.text),
+            stmt->start, stmt->end);
+        printErrors();
+    }
+
+    stmt->dec_assign.var = entry;
+
+    return stmt;
 }
 
 Stmt *parseAssignment(Parser *parser, Token symTok) {
-    Token equalTok = nextToken(parser->lex);
-    if (equalTok.type != TOK_EQUAL) {
-        queueError(msprintf("Expected '=' after variable name in assignment"),
-                   equalTok.start, equalTok.end);
-        equalTok = continueUntil(parser->lex, TOK_EQUAL_BITS);
-    }
     Expr *value = parseExpr(parser);
 
     Token semiTok = nextToken(parser->lex);
@@ -584,7 +588,14 @@ Stmt *parseAssignment(Parser *parser, Token symTok) {
 
 Stmt *parseReturn(Parser *parser, Token firstTok) {
     Token semiTok = peekToken(parser->lex);
+
     if (semiTok.type == TOK_SEMICOLON) {
+        Stmt *stmt =
+            stmtFromTwoPoints(firstTok.start, semiTok.end, STMT_RETURN);
+        stmt->returnExp = NULL;
+        nextToken(parser->lex);
+        return stmt;
+    } else if (semiTok.type == TOK_NEWLINE) {
         Stmt *stmt =
             stmtFromTwoPoints(firstTok.start, semiTok.end, STMT_RETURN);
         stmt->returnExp = NULL;
@@ -594,14 +605,19 @@ Stmt *parseReturn(Parser *parser, Token firstTok) {
 
     Expr *returnExp = parseExpr(parser);
 
+    Stmt *stmt;
     semiTok = nextToken(parser->lex);
-    if (semiTok.type != TOK_SEMICOLON) {
+    if (semiTok.type == TOK_SEMICOLON) {
+        stmt = stmtFromTwoPoints(firstTok.start, semiTok.end, STMT_RETURN);
+    } else if (semiTok.type == TOK_NEWLINE) {
+        stmt = stmtFromTwoPoints(firstTok.start, returnExp->end, STMT_RETURN);
+    } else {
         queueError("Expected ';' after return statment", semiTok.start,
                    semiTok.end);
-        semiTok = continueUntil(parser->lex, TOK_SEMICOLON_BITS);
+        printErrors();
+        exit(1);
     }
 
-    Stmt *stmt = stmtFromTwoPoints(firstTok.start, returnExp->end, STMT_RETURN);
     stmt->returnExp = returnExp;
     return stmt;
 }
@@ -610,35 +626,42 @@ Stmt *parseStmt(Parser *parser) {
     Token tok = peekToken(parser->lex);
 
     switch (tok.type) {
-        case TOK_LET:
-            nextToken(parser->lex);
-            return parseDec(parser, tok, false);
-        case TOK_MUT:
-            nextToken(parser->lex);
-            return parseDec(parser, tok, true);
         case TOK_RETURN:
             nextToken(parser->lex);
             return parseReturn(parser, tok);
         case TOK_SYM: {
             Token equalsTok = lookaheadToken(parser->lex);
-            if (equalsTok.type == TOK_EQUAL) {
-                nextToken(parser->lex);
-                return parseAssignment(parser, tok);
-            } else {
-                Expr *expr = parseExpr(parser);
-                Token semiTok = nextToken(parser->lex);
-                if (semiTok.type != TOK_SEMICOLON) {
-                    queueError(
-                        "Expected ';' after expression parsed as a standalone "
-                        "statement",
-                        expr->start, semiTok.end);
-                    semiTok = continueUntil(parser->lex, TOK_SEMICOLON_BITS);
-                }
+            switch (equalsTok.type) {
+                case TOK_EQUAL:
+                    nextToken(parser->lex);
+                    nextToken(parser->lex);
+                    return parseAssignment(parser, tok);
+                case TOK_COLON:
+                    nextToken(parser->lex);
+                    nextToken(parser->lex);
+                    return parseDec(parser, tok, true);
+                case TOK_COLONEQUAL:
+                    nextToken(parser->lex);
+                    nextToken(parser->lex);
+                    return parseInferredDec(parser, tok, true);
+                default: {
+                    Expr *expr = parseExpr(parser);
+                    Token semiTok = nextToken(parser->lex);
+                    if (semiTok.type != TOK_SEMICOLON) {
+                        queueError(
+                            "Expected ';' after expression parsed as a "
+                            "standalone "
+                            "statement",
+                            expr->start, semiTok.end);
+                        semiTok =
+                            continueUntil(parser->lex, TOK_SEMICOLON_BITS);
+                    }
 
-                Stmt *exprStmt =
-                    stmtFromTwoPoints(expr->start, semiTok.end, STMT_EXPR);
-                exprStmt->singleExpr = expr;
-                return exprStmt;
+                    Stmt *exprStmt =
+                        stmtFromTwoPoints(expr->start, semiTok.end, STMT_EXPR);
+                    exprStmt->singleExpr = expr;
+                    return exprStmt;
+                }
             }
         }
         default: {
@@ -735,6 +758,10 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
     }
 
     Type *retType = parseType(parser);
+
+    if (peekToken(parser->lex).type == TOK_NEWLINE) {
+        nextToken(parser->lex);
+    }
 
     Vector *paramTypes = newVector(sizeof(Type *), params->numItems);
 

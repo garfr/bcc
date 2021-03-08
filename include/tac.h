@@ -36,6 +36,7 @@ typedef struct {
         ADDR_TEMP,
         ADDR_INTLIT,
         ADDR_EMPTY,
+        ADDR_BOOL,
         ADDR_TAG,
     } type;
 
@@ -47,6 +48,7 @@ typedef struct {
             Type* type;
         } temp;
         HashEntry* tag;
+        int boolean;
     };
 } TACAddr;
 

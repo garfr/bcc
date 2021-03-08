@@ -24,6 +24,8 @@ enum TokenType {
     TOK_VOID,
     TOK_RECORD,
     TOK_TYPE,
+    TOK_FALSE,
+    TOK_TRUE,
 
     /* Symbols, and other values */
     TOK_SYM,
@@ -35,6 +37,7 @@ enum TokenType {
     TOK_SEMICOLON,
     TOK_COMMA,
     TOK_ARROW,
+    TOK_COLONEQUAL,
     TOK_EQUAL,
     TOK_PLUS,
     TOK_PERIOD,
@@ -47,7 +50,8 @@ enum TokenType {
     TOK_SLASH,
 
     /* Other */
-    TOK_EOF
+    TOK_EOF,
+    TOK_NEWLINE
 };
 
 typedef struct {
@@ -72,6 +76,7 @@ typedef struct {
     size_t startIdx;
     size_t endIdx;
     enum LexerState state;
+    Token previousTok;
 } Lexer;
 
 Lexer newLexer(const unsigned char *buffer, size_t bufferLen);

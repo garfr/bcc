@@ -27,6 +27,12 @@ void printToken(Token tok) {
         case TOK_PROC:
             printf("TOK_PROC");
             break;
+        case TOK_FALSE:
+            printf("TOK_FALSE");
+            break;
+        case TOK_TRUE:
+            printf("TOK_TRUE");
+            break;
         case TOK_TYPE:
             printf("TOK_TYPE");
             break;
@@ -50,6 +56,9 @@ void printToken(Token tok) {
             break;
         case TOK_COLON:
             printf("TOK_COLON");
+            break;
+        case TOK_COLONEQUAL:
+            printf("TOK_COLONEQUAL");
             break;
         case TOK_SEMICOLON:
             printf("TOK_SEMICOLON");
@@ -93,6 +102,9 @@ void printToken(Token tok) {
         case TOK_EQUAL:
             printf("TOK_EQUAL");
             break;
+        case TOK_NEWLINE:
+            printf("TOK_NEWLINE");
+            break;
         case TOK_EOF:
             printf("TOK_EOF");
             break;
@@ -113,6 +125,9 @@ void printType(Type *type) {
             break;
         case TYP_INTLIT:
             printf("TYP_INTLIT");
+            break;
+        case TYP_BOOL:
+            printf("bool");
             break;
         case TYP_BINDING:
             printf("%.*s", (int)type->typeEntry->id.len,
@@ -162,6 +177,9 @@ void printExpr(Expr *exp) {
             break;
         case EXP_VAR:
             printf("EXP_VAR: '%.*s'", (int)exp->var->id.len, exp->var->id.text);
+            break;
+        case EXP_BOOL:
+            printf("EXP_BOOL: %s", exp->boolean ? "true" : "false");
             break;
         case EXP_BINOP:
             printf("EXP_BINOP: (");
@@ -278,7 +296,10 @@ void printAddr(TACAddr addr) {
             printf("'%.*s'", (int)addr.var->id.len, addr.var->id.text);
             break;
         case ADDR_INTLIT:
-            printf("'%.*s'", (int)addr.intlit.len, addr.intlit.text);
+            printf("%.*s", (int)addr.intlit.len, addr.intlit.text);
+            break;
+        case ADDR_BOOL:
+            printf(addr.boolean ? "true" : "false");
             break;
         case ADDR_TEMP:
             printf("*t%zd", addr.temp.num);

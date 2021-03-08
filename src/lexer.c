@@ -120,6 +120,8 @@ bool newlineNeeded(Lexer *lex) {
         case TOK_SYM:
         case TOK_RPAREN:
         case TOK_RBRACKET:
+        case TOK_FALSE:
+        case TOK_TRUE:
             return true;
         default:
             return false;
