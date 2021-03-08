@@ -121,6 +121,13 @@ bool newlineNeeded(Lexer *lex) {
             return false;
     }
 }
+
+void skipline(Lexer *lex) {
+    for (; lex->endIdx <= lex->bufferLen && lex->buffer[lex->endIdx] != '\n';
+         lex->endIdx++) {
+        lex->startIdx = lex->endIdx;
+    }
+}
 /* Big and messy but works well and is actually reasonably readable */
 Token getToken(Lexer *lex) {
     for (;;) {
@@ -161,6 +168,9 @@ Token getToken(Lexer *lex) {
                     case ':':
                         lex->endIdx++;
                         lex->state = LEX_COLON;
+                        continue;
+                    case '#':
+                        skipline(lex);
                         continue;
                     case ';':
                         return makeTokenInplace(lex, TOK_SEMICOLON);
