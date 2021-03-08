@@ -362,6 +362,12 @@ void printOp(TACOp op) {
         case OP_EQUAL:
             printf("eq");
             break;
+        case OP_AND:
+            printf("and");
+            break;
+        case OP_OR:
+            printf("or");
+            break;
         case OP_ADDPARAM:
             printf("addparam");
             break;

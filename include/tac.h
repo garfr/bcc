@@ -23,6 +23,8 @@ typedef enum {
     OP_MUL,
     OP_DIV,
     OP_EQUAL,
+    OP_AND,
+    OP_OR,
 
     OP_GETPARAM,
     OP_ADDPARAM,

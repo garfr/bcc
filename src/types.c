@@ -80,8 +80,6 @@ Type* coerceBinop(int op, Type* type1, Type* type2);
 Type* coerceBinop(int op, Type* type1, Type* type2) {
     assert(type1 != NULL);
     assert(type2 != NULL);
-    assert(op == BINOP_ADD || op == BINOP_SUB || op == BINOP_MULT ||
-           op == BINOP_DIV || op == BINOP_EQUAL);
 
     if (type1->type == TYP_BINDING && type1->type == TYP_BINDING) {
         return coerceBinop(op, type1->typeEntry->data, type2->typeEntry->data);
@@ -92,15 +90,14 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
     if (type2->type == TYP_BINDING) {
         return coerceBinop(op, type1, type2->typeEntry->data);
     }
+    if (type1->type == TYP_FUN || type1->type == TYP_RECORD) {
+        return NULL;
+    }
     switch (op) {
         case BINOP_ADD:
         case BINOP_SUB:
         case BINOP_MULT:
         case BINOP_DIV:
-            if (type1->type == TYP_FUN || type1->type == TYP_RECORD) {
-                return NULL;
-            }
-
             if (type1->type == TYP_INTLIT) {
                 switch (type2->type) {
                     case TYP_S8:
@@ -138,9 +135,6 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
             }
             return NULL;
         case BINOP_EQUAL:
-            if (type1->type == TYP_FUN || type1->type == TYP_RECORD) {
-                return NULL;
-            }
             if (type1->type == TYP_INTLIT) {
                 switch (type2->type) {
                     case TYP_S8:
@@ -176,6 +170,14 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
             if (type1->type == type2->type) {
                 return BooleanLit;
             }
+            return NULL;
+
+        case BINOP_AND:
+        case BINOP_OR:
+            if (type1->type != TYP_BOOL || type2->type != TYP_BOOL) {
+                return NULL;
+            }
+            return BooleanLit;
     }
     /* This is unreachable */
     return NULL;
