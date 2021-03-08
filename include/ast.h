@@ -6,8 +6,7 @@
 //===----------------------------- About ---------------------------------===//
 //
 // Provides type definitions for the AST.
-//
-//===---------------------------------------------------------------------===//
+// ===---------------------------------------------------------------------===//
 
 #pragma once
 
@@ -78,7 +77,9 @@ typedef struct Expr {
                 BINOP_SUB,
                 BINOP_MULT,
                 BINOP_DIV,
-                BINOP_EQUAL
+                BINOP_EQUAL,
+                BINOP_AND,
+                BINOP_OR,
             } op;
         } binop;
 

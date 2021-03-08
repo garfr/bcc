@@ -30,6 +30,12 @@ void printToken(Token tok) {
         case TOK_PROC:
             printf("TOK_PROC");
             break;
+        case TOK_AND:
+            printf("TOK_AND");
+            break;
+        case TOK_OR:
+            printf("TOK_OR");
+            break;
         case TOK_FALSE:
             printf("TOK_FALSE");
             break;

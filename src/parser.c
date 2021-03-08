@@ -426,6 +426,10 @@ int parseBinop(Parser *parser) {
             return BINOP_DIV;
         case TOK_DOUBLEEQUAL:
             return BINOP_EQUAL;
+        case TOK_AND:
+            return BINOP_AND;
+        case TOK_OR:
+            return BINOP_OR;
         default:
             queueError(msprintf("Expected arithmetic operation"), tok.start,
                        tok.end);
@@ -487,7 +491,26 @@ Expr *parseComparison(Parser *parser) {
 
     return exp;
 }
-Expr *parseExpr(Parser *parser) { return parseComparison(parser); }
+
+Expr *parseBoolean(Parser *parser) {
+    Expr *exp = parseComparison(parser);
+
+    while (peekToken(parser->lex).type == TOK_AND ||
+           peekToken(parser->lex).type == TOK_OR) {
+        int op = parseBinop(parser);
+        Expr *right = parseComparison(parser);
+        Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
+        newExpr->binop.exp1 = exp;
+        newExpr->binop.exp2 = right;
+        newExpr->binop.op = op;
+        newExpr->typeExpr = NULL;
+        exp = newExpr;
+    }
+
+    return exp;
+}
+
+Expr *parseExpr(Parser *parser) { return parseBoolean(parser); }
 
 static Stmt *parseDec(Parser *parser, Token nameTok, bool isMut) {
     Type *type;
