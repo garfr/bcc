@@ -353,6 +353,9 @@ void printOp(TACOp op) {
         case OP_DIV:
             printf("div");
             break;
+        case OP_EQUAL:
+            printf("eq");
+            break;
         case OP_ADDPARAM:
             printf("addparam");
             break;

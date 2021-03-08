@@ -60,6 +60,8 @@ static TACOp astOpToTACOp(int binop) {
             return OP_MUL;
         case BINOP_DIV:
             return OP_DIV;
+        case BINOP_EQUAL:
+            return OP_EQUAL;
     }
     printf("internal compiler error: cannot convert ast op to TAC op.\n");
     exit(1);

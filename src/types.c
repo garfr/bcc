@@ -138,7 +138,6 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
             }
             return NULL;
         case BINOP_EQUAL:
-            printf("here\n");
             if (type1->type == TYP_FUN || type1->type == TYP_RECORD) {
                 return NULL;
             }
