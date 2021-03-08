@@ -105,6 +105,9 @@ void printToken(Token tok) {
         case TOK_EQUAL:
             printf("TOK_EQUAL");
             break;
+        case TOK_DOUBLEEQUAL:
+            printf("TOK_DOUBLEEQUAL");
+            break;
         case TOK_NEWLINE:
             printf("TOK_NEWLINE");
             break;
@@ -117,11 +120,29 @@ void printToken(Token tok) {
 
 void printType(Type *type) {
     switch (type->type) {
-        case TYP_SINT:
-            printf("'s%ld'", type->intsize * 8);
+        case TYP_S8:
+            printf("s8");
             break;
-        case TYP_UINT:
-            printf("'u%ld'", type->intsize * 8);
+        case TYP_S16:
+            printf("s16");
+            break;
+        case TYP_S32:
+            printf("s32");
+            break;
+        case TYP_S64:
+            printf("s64");
+            break;
+        case TYP_U8:
+            printf("u8");
+            break;
+        case TYP_U16:
+            printf("u16");
+            break;
+        case TYP_U32:
+            printf("u32");
+            break;
+        case TYP_U64:
+            printf("u64");
             break;
         case TYP_VOID:
             printf("void");

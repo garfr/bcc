@@ -155,13 +155,37 @@ Type *parseType(Parser *parser) {
             switch (tok.sym.text[0]) {
                 case 's':
                     ret = calloc(1, sizeof(Type));
-                    ret->type = TYP_SINT;
-                    ret->intsize = convertSymbolInt(tok);
+                    switch (convertSymbolInt(tok)) {
+                        case 8:
+                            ret->type = TYP_S8;
+                            break;
+                        case 16:
+                            ret->type = TYP_S16;
+                            break;
+                        case 32:
+                            ret->type = TYP_S32;
+                            break;
+                        case 64:
+                            ret->type = TYP_S64;
+                            break;
+                    }
                     return ret;
                 case 'u':
                     ret = calloc(1, sizeof(Type));
-                    ret->type = TYP_UINT;
-                    ret->intsize = convertSymbolInt(tok);
+                    switch (convertSymbolInt(tok)) {
+                        case 8:
+                            ret->type = TYP_U8;
+                            break;
+                        case 16:
+                            ret->type = TYP_U16;
+                            break;
+                        case 32:
+                            ret->type = TYP_U32;
+                            break;
+                        case 64:
+                            ret->type = TYP_U64;
+                            break;
+                    }
                     return ret;
                 default: {
                     HashEntry *entry = findHashtbl(parser->typeTable, tok.sym);
@@ -400,6 +424,8 @@ int parseBinop(Parser *parser) {
             return BINOP_MULT;
         case TOK_SLASH:
             return BINOP_DIV;
+        case TOK_DOUBLEEQUAL:
+            return BINOP_EQUAL;
         default:
             queueError(msprintf("Expected arithmetic operation"), tok.start,
                        tok.end);
@@ -445,7 +471,23 @@ Expr *parseTerm(Parser *parser) {
     return exp;
 }
 
-Expr *parseExpr(Parser *parser) { return parseTerm(parser); }
+Expr *parseComparison(Parser *parser) {
+    Expr *exp = parseTerm(parser);
+
+    while (peekToken(parser->lex).type == TOK_DOUBLEEQUAL) {
+        int op = parseBinop(parser);
+        Expr *right = parseTerm(parser);
+        Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
+        newExpr->binop.exp1 = exp;
+        newExpr->binop.exp2 = right;
+        newExpr->binop.op = op;
+        newExpr->typeExpr = NULL;
+        exp = newExpr;
+    }
+
+    return exp;
+}
+Expr *parseExpr(Parser *parser) { return parseComparison(parser); }
 
 static Stmt *parseDec(Parser *parser, Token nameTok, bool isMut) {
     Type *type;

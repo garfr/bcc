@@ -178,13 +178,15 @@ Token getToken(Lexer *lex) {
                         lex->endIdx++;
                         lex->state = LEX_COLON;
                         continue;
+                    case '=':
+                        lex->endIdx++;
+                        lex->state = LEX_EQUAL;
+                        continue;
                     case '#':
                         skipline(lex);
                         continue;
                     case ';':
                         return makeTokenInplace(lex, TOK_SEMICOLON);
-                    case '=':
-                        return makeTokenInplace(lex, TOK_EQUAL);
                     case '+':
                         return makeTokenInplace(lex, TOK_PLUS);
                     case '*':
@@ -222,6 +224,16 @@ Token getToken(Lexer *lex) {
                     return makeTokenInplace(lex, TOK_ARROW);
                 }
                 return makeTokenBehind(lex, TOK_MINUS);
+            }
+            case LEX_EQUAL: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeTokenBehind(lex, TOK_EQUAL);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (c == '=') {
+                    return makeTokenInplace(lex, TOK_DOUBLEEQUAL);
+                }
+                return makeTokenBehind(lex, TOK_EQUAL);
             }
             case LEX_COLON: {
                 if (lex->endIdx >= lex->bufferLen) {

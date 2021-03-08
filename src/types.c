@@ -27,18 +27,34 @@
 static Type* IntegerLit = &(Type){.type = TYP_INTLIT, {}};
 static Type* BooleanLit = &(Type){.type = TYP_BOOL, {}};
 
-/* This is only needed because the current error handling system does not allow
- * you to just pass a type and have the error printer call printType This means
- * an actual string must be allocated
- * When the error system is improved this can be deleted */
+// clang-format off
+
+// clang-format on
+
+/* This is only needed because the current error handling system does not
+ * allow you to just pass a type and have the error printer call printType
+ * This means an actual string must be allocated When the error system is
+ * improved this can be deleted */
 char* stringOfType(Type* type) {
     switch (type->type) {
-        case TYP_SINT:
-            return msprintf("s%ld", type->intsize * 8);
+        case TYP_S8:
+            return "s8";
+        case TYP_S16:
+            return "s16";
+        case TYP_S32:
+            return "s32";
+        case TYP_S64:
+            return "s64";
+        case TYP_U8:
+            return "u8";
+        case TYP_U16:
+            return "u16";
+        case TYP_U32:
+            return "u32";
+        case TYP_U64:
+            return "u64";
         case TYP_VOID:
             return "void";
-        case TYP_UINT:
-            return msprintf("u%ld", type->intsize * 8);
         case TYP_BOOL:
             return "bool";
         case TYP_BINDING:
@@ -65,7 +81,7 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
     assert(type1 != NULL);
     assert(type2 != NULL);
     assert(op == BINOP_ADD || op == BINOP_SUB || op == BINOP_MULT ||
-           op == BINOP_DIV);
+           op == BINOP_DIV || op == BINOP_EQUAL);
 
     switch (op) {
         case BINOP_ADD:

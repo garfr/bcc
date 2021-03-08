@@ -20,8 +20,14 @@
  * arrays, pointers, and user defined records, enums, and tuples later */
 typedef struct Type {
     enum TypeType {
-        TYP_SINT,
-        TYP_UINT,
+        TYP_S8,
+        TYP_S16,
+        TYP_S32,
+        TYP_S64,
+        TYP_U8,
+        TYP_U16,
+        TYP_U32,
+        TYP_U64,
         TYP_RECORD,
         TYP_VOID,
         TYP_INTLIT,
@@ -32,8 +38,6 @@ typedef struct Type {
     } type;
 
     union {
-        /* Size of the integer in bytes, must be a power of 2 */
-        int64_t intsize;
         struct {
             Vector *args;  // Types*
             struct Type *retType;
@@ -69,7 +73,13 @@ typedef struct Expr {
         struct {
             struct Expr *exp1;
             struct Expr *exp2;
-            enum { BINOP_ADD, BINOP_SUB, BINOP_MULT, BINOP_DIV } op;
+            enum {
+                BINOP_ADD,
+                BINOP_SUB,
+                BINOP_MULT,
+                BINOP_DIV,
+                BINOP_EQUAL
+            } op;
         } binop;
 
         struct {
