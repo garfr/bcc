@@ -83,218 +83,153 @@ Type* coerceBinop(int op, Type* type1, Type* type2) {
     assert(op == BINOP_ADD || op == BINOP_SUB || op == BINOP_MULT ||
            op == BINOP_DIV || op == BINOP_EQUAL);
 
+    if (type1->type == TYP_BINDING && type1->type == TYP_BINDING) {
+        return coerceBinop(op, type1->typeEntry->data, type2->typeEntry->data);
+    }
+    if (type1->type == TYP_BINDING) {
+        return coerceBinop(op, type1->typeEntry->data, type2);
+    }
+    if (type2->type == TYP_BINDING) {
+        return coerceBinop(op, type1, type2->typeEntry->data);
+    }
     switch (op) {
         case BINOP_ADD:
         case BINOP_SUB:
         case BINOP_MULT:
         case BINOP_DIV:
-            switch (type1->type) {
-                case TYP_SINT:
-                    switch (type2->type) {
-                        case TYP_SINT:
-                            if (type1->intsize == type2->intsize) {
-                                return type1;
-                            }
-                            return NULL;
-                        case TYP_BINDING:
-                            return coerceBinop(op, type1,
-                                               type2->typeEntry->data);
-                        case TYP_UINT:
-                        case TYP_VOID:
-                        case TYP_FUN:
-                        case TYP_BOOL:
-                        case TYP_RECORD:
-                            return NULL;
-                        case TYP_INTLIT:
-                            return type1;
-                    }
-                    break;
-                case TYP_UINT:
-                    switch (type2->type) {
-                        case TYP_UINT:
-                            if (type1->intsize == type2->intsize) {
-                                return type1;
-                            }
-                            return NULL;
-                        case TYP_SINT:
-                        case TYP_RECORD:
-                        case TYP_FUN:
-                        case TYP_VOID:
-                        case TYP_BOOL:
-                            return NULL;
-                        case TYP_BINDING:
-                            return coerceBinop(op, type1,
-                                               type2->typeEntry->data);
-                        case TYP_INTLIT:
-                            return type1;
-                    }
-                    break;
-                case TYP_INTLIT:
-                    switch (type2->type) {
-                        case TYP_SINT:
-                        case TYP_UINT:
-                        case TYP_INTLIT:
-                            return type1;
-                        case TYP_VOID:
-                        case TYP_BOOL:
-                        case TYP_RECORD:
-                        case TYP_FUN:
-                            return NULL;
-                        case TYP_BINDING:
-                            return coerceBinop(op, type1,
-                                               type2->typeEntry->data);
-                    }
-                    break;
-                case TYP_VOID:
-                    return NULL;
-                case TYP_FUN:
-                    switch (type2->type) {
-                        case TYP_SINT:
-                        case TYP_UINT:
-                        case TYP_BOOL:
-                        case TYP_INTLIT:
-                        case TYP_VOID:
-                        case TYP_FUN:
-                        case TYP_RECORD:
-                            return NULL;
-                        case TYP_BINDING:
-                            return coerceBinop(op, type1,
-                                               type2->typeEntry->data);
-                    }
-                    break;
-                case TYP_BINDING:
-                    switch (type2->type) {
-                        case TYP_SINT:
-                        case TYP_UINT:
-                        case TYP_RECORD:
-                        case TYP_INTLIT:
-                        case TYP_BOOL:
-                        case TYP_VOID:
-                        case TYP_FUN:
-                            return NULL;
-                        case TYP_BINDING:
-                            if (compareSymbol(type1->typeEntry->id,
-                                              type2->typeEntry->id)) {
-                                return type1;
-                            }
-                            return coerceBinop(op, type1->typeEntry->data,
-                                               type2->typeEntry->data);
-                    }
-                    break;
-                case TYP_RECORD:
-                    switch (type2->type) {
-                        case TYP_BOOL:
-                        case TYP_SINT:
-                        case TYP_UINT:
-                        case TYP_INTLIT:
-                        case TYP_VOID:
-                        case TYP_FUN:
-                            return NULL;
-                        case TYP_BINDING:
-                            return coerceBinop(op, type1->typeEntry->data,
-                                               type2->typeEntry->data);
-                        case TYP_RECORD:
-                            printf(
-                                "Internal compiler error: Cannot compare "
-                                "record types.\n");
-                            exit(1);
-                    }
-                    break;
-                case TYP_BOOL:
-                    switch (type2->type) {
-                        case TYP_BOOL:
-                            return type1;
-                        case TYP_BINDING:
-                            return coerceBinop(op, type1,
-                                               type2->typeEntry->data);
-                        default:
-                            return NULL;
-                    }
+            if (type1->type == TYP_FUN || type1->type == TYP_RECORD) {
+                return NULL;
             }
-            break;
+
+            if (type1->type == TYP_INTLIT) {
+                switch (type2->type) {
+                    case TYP_S8:
+                    case TYP_S16:
+                    case TYP_S32:
+                    case TYP_S64:
+                    case TYP_U8:
+                    case TYP_U16:
+                    case TYP_U32:
+                    case TYP_U64:
+                    case TYP_INTLIT:
+                        return type2;
+                    default:
+                        return NULL;
+                }
+            }
+            if (type2->type == TYP_INTLIT) {
+                switch (type1->type) {
+                    case TYP_S8:
+                    case TYP_S16:
+                    case TYP_S32:
+                    case TYP_S64:
+                    case TYP_U8:
+                    case TYP_U16:
+                    case TYP_U32:
+                    case TYP_U64:
+                    case TYP_INTLIT:
+                        return type1;
+                    default:
+                        return NULL;
+                }
+            }
+            if (type1->type == type2->type) {
+                return type1;
+            }
+            return NULL;
+        case BINOP_EQUAL:
+            printf("here\n");
+            if (type1->type == TYP_FUN || type1->type == TYP_RECORD) {
+                return NULL;
+            }
+            if (type1->type == TYP_INTLIT) {
+                switch (type2->type) {
+                    case TYP_S8:
+                    case TYP_S16:
+                    case TYP_S32:
+                    case TYP_S64:
+                    case TYP_U8:
+                    case TYP_U16:
+                    case TYP_U32:
+                    case TYP_U64:
+                    case TYP_INTLIT:
+                        return BooleanLit;
+                    default:
+                        return NULL;
+                }
+            }
+            if (type2->type == TYP_INTLIT) {
+                switch (type1->type) {
+                    case TYP_S8:
+                    case TYP_S16:
+                    case TYP_S32:
+                    case TYP_S64:
+                    case TYP_U8:
+                    case TYP_U16:
+                    case TYP_U32:
+                    case TYP_U64:
+                    case TYP_INTLIT:
+                        return BooleanLit;
+                    default:
+                        return NULL;
+                }
+            }
+            if (type1->type == type2->type) {
+                return BooleanLit;
+            }
     }
     /* This is unreachable */
     return NULL;
 }
 
 Type* coerceAssignment(Type* type1, Type* type2) {
-    switch (type1->type) {
-        case TYP_SINT:
-            switch (type2->type) {
-                case TYP_SINT:
-                    if (type1->intsize == type2->intsize) {
-                        return type1;
-                    }
-                    return NULL;
-                case TYP_UINT:
-                case TYP_VOID:
-                case TYP_BOOL:
-                case TYP_FUN:
-                case TYP_RECORD:
-                    return NULL;
-                case TYP_INTLIT:
-                    return type1;
-                case TYP_BINDING:
-                    return coerceAssignment(type1, type2->typeEntry->data);
-            }
-            break;
-        case TYP_UINT:
-            switch (type2->type) {
-                case TYP_UINT:
-                    if (type1->intsize == type2->intsize) {
-                        return type1;
-                    }
-                    return NULL;
-                case TYP_RECORD:
-                case TYP_SINT:
-                case TYP_FUN:
-                case TYP_BOOL:
-                case TYP_VOID:
-                    return NULL;
-                case TYP_INTLIT:
-                    return type1;
-                case TYP_BINDING:
-                    return coerceAssignment(type1, type2->typeEntry->data);
-            }
-            break;
-        case TYP_BINDING:
-            switch (type2->type) {
-                case TYP_UINT:
-                case TYP_SINT:
-                case TYP_FUN:
-                case TYP_VOID:
-                case TYP_BOOL:
-                case TYP_RECORD:
-                case TYP_INTLIT:
-                    return coerceAssignment(type1->typeEntry->data, type2);
-                case TYP_BINDING:
-                    if (compareSymbol(type1->typeEntry->id,
-                                      type2->typeEntry->id)) {
-                        return type1;
-                    }
-                    return NULL;
-            }
-            break;
-        case TYP_VOID:
-            if (type2->type == TYP_BINDING) {
-                return coerceAssignment(type1, type2->typeEntry->data);
-            }
-            return NULL;
-        case TYP_RECORD: {
-            exit(1);
+    if (type1->type == TYP_FUN || type1->type == TYP_RECORD) {
+        return NULL;
+    }
+    if (type1->type == TYP_BINDING && type1->type == TYP_BINDING) {
+        return coerceAssignment(type1->typeEntry->data, type2->typeEntry->data);
+    }
+    if (type1->type == TYP_BINDING) {
+        return coerceAssignment(type1->typeEntry->data, type2);
+    }
+    if (type2->type == TYP_BINDING) {
+        return coerceAssignment(type1, type2->typeEntry->data);
+    }
+
+    if (type1->type == TYP_INTLIT) {
+        switch (type2->type) {
+            case TYP_S8:
+            case TYP_S16:
+            case TYP_S32:
+            case TYP_S64:
+            case TYP_U8:
+            case TYP_U16:
+            case TYP_U32:
+            case TYP_U64:
+            case TYP_INTLIT:
+                return type2;
+            default:
+                return NULL;
         }
-        case TYP_BOOL:
-            switch (type2->type) {
-                case TYP_BOOL:
-                    return type1;
-                case TYP_BINDING:
-                    return coerceAssignment(type1, type2->typeEntry->data);
-                default:
-                    return NULL;
-            }
-        case TYP_INTLIT:
-        case TYP_FUN:
-            return NULL;
+    }
+    if (type2->type == TYP_INTLIT) {
+        switch (type1->type) {
+            case TYP_S8:
+            case TYP_S16:
+            case TYP_S32:
+            case TYP_S64:
+            case TYP_U8:
+            case TYP_U16:
+            case TYP_U32:
+            case TYP_U64:
+            case TYP_INTLIT:
+                return type1;
+            default:
+                return NULL;
+        }
+    }
+    if (type1->type == type2->type) {
+        return type1;
     }
     return NULL;
 }
@@ -415,9 +350,18 @@ void typeExpression(Scope* scope, Expr* exp) {
 /* Calculates the size of a type in bytes */
 int64_t calculateSize(Type* type) {
     switch (type->type) {
-        case TYP_SINT:
-        case TYP_UINT:
-            return type->intsize;
+        case TYP_S8:
+        case TYP_U8:
+            return 1;
+        case TYP_S16:
+        case TYP_U16:
+            return 2;
+        case TYP_S32:
+        case TYP_U32:
+            return 4;
+        case TYP_S64:
+        case TYP_U64:
+            return 8;
         case TYP_VOID:
             return 0;
         case TYP_FUN:
@@ -592,7 +536,7 @@ void typeToplevel(Toplevel* top) {
 
             if (!returnsCorrectly && top->fn->retType->type != TYP_VOID) {
                 queueError("Function never returns a correct type",
-                           top->fn->end, top->fn->end);
+                           top->fn->start, top->fn->start);
             }
         }
     }
