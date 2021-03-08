@@ -38,6 +38,7 @@ typedef struct {
 } Parser;
 
 static Type *VoidType = &(Type){.type = TYP_VOID, {}};
+static Type *BooleanType = &(Type){.type = TYP_BOOL, {}};
 
 /* Bit flags used by continueUntil to allow continuing until one of several
  * tokens is reached */
@@ -142,7 +143,7 @@ Type *parseType(Parser *parser) {
     Type *ret;
 
     Token tok = nextToken(parser->lex);
-    if (tok.type != TOK_SYM && tok.type != TOK_VOID) {
+    if (tok.type != TOK_SYM && tok.type != TOK_VOID && tok.type != TOK_BOOL) {
         queueError(msprintf("Unexpected token, expected type to be a "
                             "single symbol, arrays "
                             "and pointers are not supported"),
@@ -180,6 +181,8 @@ Type *parseType(Parser *parser) {
             break;
         case TOK_VOID:
             return VoidType;
+        case TOK_BOOL:
+            return BooleanType;
 
         default:
             assert(false);

@@ -23,6 +23,7 @@ enum TokenType {
     TOK_RETURN,
     TOK_VOID,
     TOK_RECORD,
+    TOK_BOOL,
     TOK_TYPE,
     TOK_FALSE,
     TOK_TRUE,
@@ -39,6 +40,7 @@ enum TokenType {
     TOK_ARROW,
     TOK_COLONEQUAL,
     TOK_EQUAL,
+    TOK_DOUBLEEQUAL,
     TOK_PLUS,
     TOK_PERIOD,
     TOK_LPAREN,
@@ -68,7 +70,14 @@ typedef struct {
 
 } Token;
 
-enum LexerState { LEX_START, LEX_SYMBOL, LEX_INT, LEX_DASH, LEX_COLON };
+enum LexerState {
+    LEX_START,
+    LEX_SYMBOL,
+    LEX_INT,
+    LEX_DASH,
+    LEX_COLON,
+    LEX_EQUAL
+};
 
 typedef struct {
     const unsigned char *buffer;

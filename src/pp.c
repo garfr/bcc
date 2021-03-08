@@ -21,6 +21,9 @@ void printToken(Token tok) {
         case TOK_LET:
             printf("TOK_LET");
             break;
+        case TOK_BOOL:
+            printf("TOK_BOOL");
+            break;
         case TOK_RETURN:
             printf("TOK_RETURN");
             break;
