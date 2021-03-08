@@ -110,8 +110,19 @@ static Token makeIntBehind(Lexer *lex) {
     return tok;
 }
 
+bool newlineNeeded(Lexer *lex) {
+    switch (lex->previousTok.type) {
+        case TOK_INT:
+        case TOK_SYM:
+        case TOK_RPAREN:
+        case TOK_RBRACKET:
+            return true;
+        default:
+            return false;
+    }
+}
 /* Big and messy but works well and is actually reasonably readable */
-Token nextToken(Lexer *lex) {
+Token getToken(Lexer *lex) {
     for (;;) {
         switch (lex->state) {
             case LEX_START: {
@@ -127,6 +138,14 @@ Token nextToken(Lexer *lex) {
                 if (isdigit(c)) {
                     lex->state = LEX_INT;
                     lex->endIdx++;
+                    continue;
+                }
+                if (c == '\n') {
+                    if (newlineNeeded(lex)) {
+                        return makeTokenInplace(lex, TOK_NEWLINE);
+                    }
+                    lex->endIdx++;
+                    lex->startIdx = lex->endIdx;
                     continue;
                 }
                 if (isspace(c)) {
@@ -149,20 +168,20 @@ Token nextToken(Lexer *lex) {
                         return makeTokenInplace(lex, TOK_EQUAL);
                     case '+':
                         return makeTokenInplace(lex, TOK_PLUS);
-                    case '.':
-                        return makeTokenInplace(lex, TOK_PERIOD);
                     case '*':
                         return makeTokenInplace(lex, TOK_STAR);
                     case ')':
                         return makeTokenInplace(lex, TOK_RPAREN);
+                    case '(':
+                        return makeTokenInplace(lex, TOK_LPAREN);
                     case ',':
                         return makeTokenInplace(lex, TOK_COMMA);
+                    case '.':
+                        return makeTokenInplace(lex, TOK_PERIOD);
                     case '{':
                         return makeTokenInplace(lex, TOK_LBRACKET);
                     case '}':
                         return makeTokenInplace(lex, TOK_RBRACKET);
-                    case '(':
-                        return makeTokenInplace(lex, TOK_LPAREN);
                     case '/':
                         return makeTokenInplace(lex, TOK_SLASH);
                     default: {
@@ -191,7 +210,9 @@ Token nextToken(Lexer *lex) {
                 }
                 unsigned char c = lex->buffer[lex->endIdx];
                 if (c == ':') {
-                    return makeTokenInplace(lex, TOK_COLON);
+                    return makeTokenInplace(lex, TOK_DOUBLECOLON);
+                } else if (c == '=') {
+                    return makeTokenInplace(lex, TOK_COLONEQUAL);
                 }
                 return makeTokenBehind(lex, TOK_COLON);
             }
@@ -224,9 +245,11 @@ Token nextToken(Lexer *lex) {
     }
 }
 
+Token nextToken(Lexer *lex) { return lex->previousTok = getToken(lex); }
+
 Token peekToken(Lexer *lex) {
     Lexer old = *lex;
-    Token ret = nextToken(lex);
+    Token ret = getToken(lex);
     *lex = old;
     return ret;
 }
@@ -234,7 +257,7 @@ Token peekToken(Lexer *lex) {
 Token lookaheadToken(Lexer *lex) {
     Lexer old = *lex;
     nextToken(lex);
-    Token ret = peekToken(lex);
+    Token ret = getToken(lex);
     *lex = old;
     return ret;
 }
