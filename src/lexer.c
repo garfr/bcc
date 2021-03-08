@@ -85,6 +85,10 @@ static Token makeSymbolBehind(Lexer *lex) {
         tok.type = TOK_TRUE;
     } else if (compareSymbolStr(sym, "false")) {
         tok.type = TOK_FALSE;
+    } else if (compareSymbolStr(sym, "and")) {
+        tok.type = TOK_AND;
+    } else if (compareSymbolStr(sym, "or")) {
+        tok.type = TOK_OR;
     } else {
         tok.sym = sym;
         tok.type = TOK_SYM;

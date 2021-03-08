@@ -27,6 +27,8 @@ enum TokenType {
     TOK_TYPE,
     TOK_FALSE,
     TOK_TRUE,
+    TOK_AND,
+    TOK_OR,
 
     /* Symbols, and other values */
     TOK_SYM,
