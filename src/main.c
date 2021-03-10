@@ -22,6 +22,7 @@
 //
 //===---------------------------------------------------------------------===//
 
+#include <emit.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -33,7 +34,6 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <tac.h>
 #include <types.h>
 #include <unistd.h>
 
@@ -79,24 +79,16 @@ int main(int argc, char *argv[]) {
 
     Lexer lex = newLexer(mapped_file, file_stats.st_size);
 
-    AST *ast = parseSource(&lex);
-    annotateAST(ast);
+    UR_AST *ast = parseSource(&lex);
+    /*annotateAST(ast);*/
 
-    /*printAST(ast);*/
-
-    if (errorsExist()) {
-        printErrors();
-    }
-
-    TAC tac = convertAST(ast);
-
-    printTAC(&tac);
+    printURAST(ast);
 
     if (errorsExist()) {
         printErrors();
     }
 
-    /*generateCode(&tac, ast->globalScope->vars, stdout);*/
+    /*generateCode(ast);*/
 
     if (errorsExist()) {
         printErrors();

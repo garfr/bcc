@@ -37,8 +37,17 @@ typedef struct {
     Hashtbl *typeTable;
 } Parser;
 
-static Type *VoidType = &(Type){.type = TYP_VOID, {}};
-static Type *BooleanType = &(Type){.type = TYP_BOOL, {}};
+/* These types dont need to be dynamically allocated */
+static UR_Type *VoidType = &(UR_Type){.type = TYP_VOID, {}};
+static UR_Type *BooleanType = &(UR_Type){.type = TYP_BOOL, {}};
+static UR_Type *S8Type = &(UR_Type){.type = TYP_S8, {}};
+static UR_Type *S16Type = &(UR_Type){.type = TYP_S16, {}};
+static UR_Type *S32Type = &(UR_Type){.type = TYP_S32, {}};
+static UR_Type *S64Type = &(UR_Type){.type = TYP_S64, {}};
+static UR_Type *U8Type = &(UR_Type){.type = TYP_U8, {}};
+static UR_Type *U16Type = &(UR_Type){.type = TYP_U16, {}};
+static UR_Type *U32Type = &(UR_Type){.type = TYP_U32, {}};
+static UR_Type *U64Type = &(UR_Type){.type = TYP_U64, {}};
 
 /* Bit flags used by continueUntil to allow continuing until one of several
  * tokens is reached */
@@ -81,24 +90,24 @@ Token continueUntil(Lexer *lex, int bitFlags) {
 
 /* Creates a new expression with the same position information as given
  * token */
-Expr *exprFromToken(Token tok, enum ExprType type) {
-    Expr *exp = calloc(1, sizeof(Expr));
+UR_Expr *exprFromToken(Token tok, enum ExprType type) {
+    UR_Expr *exp = calloc(1, sizeof(UR_Expr));
     exp->type = type;
     exp->start = tok.start;
     exp->end = tok.end;
     return exp;
 }
 
-Expr *exprFromTwoPoints(size_t start, size_t end, enum ExprType type) {
-    Expr *exp = calloc(1, sizeof(Expr));
+UR_Expr *exprFromTwoPoints(size_t start, size_t end, enum ExprType type) {
+    UR_Expr *exp = calloc(1, sizeof(UR_Expr));
     exp->type = type;
     exp->start = start;
     exp->end = end;
     return exp;
 }
 
-Stmt *stmtFromTwoPoints(size_t start, size_t end, enum StmtType type) {
-    Stmt *ret = calloc(1, sizeof(Stmt));
+UR_Stmt *stmtFromTwoPoints(size_t start, size_t end, enum StmtType type) {
+    UR_Stmt *ret = calloc(1, sizeof(UR_Stmt));
     ret->start = start;
     ret->end = end;
     ret->type = type;
@@ -106,7 +115,7 @@ Stmt *stmtFromTwoPoints(size_t start, size_t end, enum StmtType type) {
 }
 
 static HashEntry *addToScope(Scope *scope, Symbol sym, bool isMut) {
-    TypedEntry *entry = calloc(1, sizeof(TypedEntry));
+    UnresolvedEntry *entry = calloc(1, sizeof(UnresolvedEntry));
     entry->isMut = isMut;
     entry->type = NULL;
     return insertHashtbl(scope->vars, sym, entry);
@@ -139,9 +148,7 @@ int64_t convertSymbolInt(Token tok) {
     return ret / 8;
 }
 
-Type *parseType(Parser *parser) {
-    Type *ret;
-
+UR_Type *parseType(Parser *parser) {
     Token tok = nextToken(parser->lex);
     if (tok.type != TOK_SYM && tok.type != TOK_VOID && tok.type != TOK_BOOL) {
         queueError(msprintf("Unexpected token, expected type to be a "
@@ -150,55 +157,52 @@ Type *parseType(Parser *parser) {
                    tok.start, tok.end);
         tok = continueUntil(parser->lex, TOK_SYM_BITS);
     }
+
     switch (tok.type) {
         case TOK_SYM:
             switch (tok.sym.text[0]) {
                 case 's':
-                    ret = calloc(1, sizeof(Type));
                     switch (convertSymbolInt(tok)) {
+                        case 1:
+                            return S8Type;
+                        case 2:
+                            return S16Type;
+                        case 4:
+                            return S32Type;
                         case 8:
-                            ret->type = TYP_S8;
-                            break;
-                        case 16:
-                            ret->type = TYP_S16;
-                            break;
-                        case 32:
-                            ret->type = TYP_S32;
-                            break;
-                        case 64:
-                            ret->type = TYP_S64;
-                            break;
+                            return S64Type;
+                        default:
+                            printf("%ld\n", convertSymbolInt(tok));
+                            queueError(
+                                "Signed integer types can only be 8, 16, 32, "
+                                "or 64 bits",
+                                tok.start, tok.end);
+                            printErrors();
+                            exit(1);
                     }
-                    return ret;
                 case 'u':
-                    ret = calloc(1, sizeof(Type));
                     switch (convertSymbolInt(tok)) {
+                        case 1:
+                            return U8Type;
+                        case 2:
+                            return U16Type;
+                        case 4:
+                            return U32Type;
                         case 8:
-                            ret->type = TYP_U8;
-                            break;
-                        case 16:
-                            ret->type = TYP_U16;
-                            break;
-                        case 32:
-                            ret->type = TYP_U32;
-                            break;
-                        case 64:
-                            ret->type = TYP_U64;
-                            break;
+                            return U64Type;
+                        default:
+                            queueError(
+                                "Unisigned integer types can only be 8, 16, "
+                                "32, "
+                                "or 64 bits",
+                                tok.start, tok.end);
+                            printErrors();
+                            exit(1);
                     }
-                    return ret;
                 default: {
-                    HashEntry *entry = findHashtbl(parser->typeTable, tok.sym);
-                    if (entry == NULL) {
-                        queueError(
-                            msprintf("Could not find a type with name %.*s",
-                                     (int)tok.sym.len, tok.sym.text),
-                            tok.start, tok.end);
-                        printErrors();
-                    }
-                    ret = calloc(1, sizeof(Type));
+                    UR_Type *ret = calloc(1, sizeof(UR_Type));
                     ret->type = TYP_BINDING;
-                    ret->typeEntry = entry;
+                    ret->bindingName = tok.sym;
                     return ret;
                 }
             }
@@ -214,8 +218,9 @@ Type *parseType(Parser *parser) {
     }
 }
 
-/* Includes all the above types, plus records and such */
-Type *parseComplexType(Parser *parser) {
+/* Includes all the above types, plus records and other types which are not
+ * allowed except in type declarations */
+UR_Type *parseComplexType(Parser *parser) {
     Token firstTok = peekToken(parser->lex);
 
     if (firstTok.type == TOK_RECORD) {
@@ -230,6 +235,7 @@ Type *parseComplexType(Parser *parser) {
                            symTok.end);
                 symTok = continueUntil(parser->lex, TOK_SYM_BITS);
             }
+
             Token colonTok = nextToken(parser->lex);
             if (colonTok.type != TOK_COLON) {
                 queueError("Expected ':' after name of record field",
@@ -237,12 +243,13 @@ Type *parseComplexType(Parser *parser) {
                 colonTok = continueUntil(parser->lex, TOK_COLON_BITS);
             }
 
-            Type *fieldType = parseType(parser);
+            UR_Type *fieldType = parseType(parser);
 
             Token commaToken = peekToken(parser->lex);
             if (commaToken.type == TOK_COMMA) {
                 nextToken(parser->lex);
             }
+
             HashEntry *entry =
                 insertHashtbl(recordFields, symTok.sym, fieldType);
 
@@ -258,7 +265,7 @@ Type *parseComplexType(Parser *parser) {
         // Skip over the end token
         nextToken(parser->lex);
 
-        Type *type = calloc(1, sizeof(Type));
+        UR_Type *type = calloc(1, sizeof(UR_Type));
         type->type = TYP_RECORD;
         type->record.recordFields = recordFields;
         type->record.vec = vec;
@@ -267,37 +274,28 @@ Type *parseComplexType(Parser *parser) {
     return parseType(parser);
 }
 
-Expr *parseExpr(Parser *parser);
+UR_Expr *parseExpr(Parser *parser);
 
-Expr *parseFuncall(Parser *parser, Token symTok) {
-    HashEntry *value = findInScope(parser->currentScope, symTok.sym);
-    if (value == NULL) {
-        queueError(msprintf("Cannot find variable '%.*s' in scope",
-                            symTok.sym.len, symTok.sym.text),
-                   symTok.start, symTok.end);
-        printErrors();
-    }
-
-    Vector *args = newVector(sizeof(Expr *), 0);
+UR_Expr *parseFuncall(Parser *parser, Token symTok) {
+    Vector *args = newVector(sizeof(UR_Expr *), 0);
 
     while (peekToken(parser->lex).type != TOK_RPAREN) {
-        Expr *expr = parseExpr(parser);
+        UR_Expr *expr = parseExpr(parser);
         pushVector(args, &expr);
     }
 
     Token endTok = nextToken(parser->lex);
 
-    Expr *funcall = calloc(1, sizeof(Expr));
+    UR_Expr *funcall = calloc(1, sizeof(UR_Expr));
     funcall->type = EXP_FUNCALL;
     funcall->funcall.arguments = args;
-    funcall->funcall.name = value;
+    funcall->funcall.name = symTok.sym;
     funcall->start = symTok.start;
-    funcall->typeExpr = ((TypedEntry *)value->data)->type->fun.retType;
     funcall->end = endTok.end;
     return funcall;
 }
 
-Expr *parseRecordLit(Parser *parser, Token symTok) {
+UR_Expr *parseRecordLit(Parser *parser, Token symTok) {
     HashEntry *entry = findHashtbl(parser->typeTable, symTok.sym);
 
     if (entry == NULL) {
@@ -309,13 +307,6 @@ Expr *parseRecordLit(Parser *parser, Token symTok) {
     Hashtbl *recordLitFields = newHashtbl(0);
 
     while (peekToken(parser->lex).type != TOK_RBRACKET) {
-        Token periodTok = nextToken(parser->lex);
-        if (periodTok.type != TOK_PERIOD) {
-            queueError("Expected '.' before name of record field",
-                       periodTok.start, periodTok.end);
-            periodTok = continueUntil(parser->lex, TOK_PERIOD_BITS);
-        }
-
         Token symTok = nextToken(parser->lex);
         if (symTok.type != TOK_SYM) {
             queueError("Expected name of record field", symTok.start,
@@ -323,14 +314,14 @@ Expr *parseRecordLit(Parser *parser, Token symTok) {
             symTok = continueUntil(parser->lex, TOK_SYM_BITS);
         }
 
-        Token equalsTok = nextToken(parser->lex);
-        if (equalsTok.type != TOK_EQUAL) {
+        Token colonTok = nextToken(parser->lex);
+        if (colonTok.type != TOK_EQUAL) {
             queueError("Expected ':' after name of record field",
-                       equalsTok.start, equalsTok.end);
-            equalsTok = continueUntil(parser->lex, TOK_EQUAL_BITS);
+                       colonTok.start, colonTok.end);
+            colonTok = continueUntil(parser->lex, TOK_EQUAL_BITS);
         }
 
-        Expr *fieldExpr = parseExpr(parser);
+        UR_Expr *fieldExpr = parseExpr(parser);
 
         Token commaToken = peekToken(parser->lex);
         if (commaToken.type == TOK_COMMA) {
@@ -346,21 +337,20 @@ Expr *parseRecordLit(Parser *parser, Token symTok) {
 
     Token rparenToken = nextToken(parser->lex);
 
-    Expr *ret = exprFromTwoPoints(symTok.start, rparenToken.end, EXP_RECORDLIT);
+    UR_Expr *ret =
+        exprFromTwoPoints(symTok.start, rparenToken.end, EXP_RECORDLIT);
     ret->reclit.fields = recordLitFields;
-    ret->reclit.type = entry;
+    ret->reclit.recordName = symTok.sym;
     return ret;
 }
 
-Expr *parsePrimary(Parser *parser) {
-    Expr *ret;
-
+UR_Expr *parsePrimary(Parser *parser) {
+    UR_Expr *ret;
     Token tok = nextToken(parser->lex);
     switch (tok.type) {
         case TOK_INT:
             ret = exprFromToken(tok, EXP_INT);
             ret->intlit = tok.intnum;
-            ret->typeExpr = NULL;
             return ret;
         case TOK_SYM:
 
@@ -375,31 +365,16 @@ Expr *parsePrimary(Parser *parser) {
                 default:
                     ret = exprFromToken(tok, EXP_VAR);
 
-                    HashEntry *entry =
-                        findInScope(parser->currentScope, tok.sym);
-                    if (entry == NULL) {
-                        queueError(
-                            msprintf("Cannot find variable: '%.*s' in any "
-                                     "scope. Must be undeclared",
-                                     tok.sym.len, (char *)tok.sym.text),
-                            tok.start, tok.end);
-                        /* Must fail */
-                        printErrors();
-                    }
-
-                    ret->var = entry;
-                    ret->typeExpr = NULL;
+                    ret->var = tok.sym;
                     return ret;
             }
         case TOK_FALSE:
             ret = exprFromToken(tok, EXP_BOOL);
             ret->boolean = false;
-            ret->typeExpr = NULL;
             return ret;
         case TOK_TRUE:
             ret = exprFromToken(tok, EXP_BOOL);
             ret->boolean = true;
-            ret->typeExpr = NULL;
             return ret;
 
         default:
@@ -439,83 +414,78 @@ int parseBinop(Parser *parser) {
     }
 }
 
-Expr *parseFactor(Parser *parser) {
-    Expr *exp = parsePrimary(parser);
+UR_Expr *parseFactor(Parser *parser) {
+    UR_Expr *exp = parsePrimary(parser);
 
     while (peekToken(parser->lex).type == TOK_STAR ||
            peekToken(parser->lex).type == TOK_SLASH) {
         int op = parseBinop(parser);
-        Expr *right = parsePrimary(parser);
-        Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
+        UR_Expr *right = parsePrimary(parser);
+        UR_Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
         newExpr->binop.exp1 = exp;
         newExpr->binop.exp2 = right;
         newExpr->binop.op = op;
-        newExpr->typeExpr = NULL;
         exp = newExpr;
     }
 
     return exp;
 }
 
-Expr *parseTerm(Parser *parser) {
-    Expr *exp = parseFactor(parser);
+UR_Expr *parseTerm(Parser *parser) {
+    UR_Expr *exp = parseFactor(parser);
 
     while (peekToken(parser->lex).type == TOK_PLUS ||
            peekToken(parser->lex).type == TOK_MINUS) {
         int op = parseBinop(parser);
-        Expr *right = parseFactor(parser);
-        Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
+        UR_Expr *right = parseFactor(parser);
+        UR_Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
         newExpr->binop.exp1 = exp;
         newExpr->binop.exp2 = right;
         newExpr->binop.op = op;
-        newExpr->typeExpr = NULL;
         exp = newExpr;
     }
 
     return exp;
 }
 
-Expr *parseComparison(Parser *parser) {
-    Expr *exp = parseTerm(parser);
+UR_Expr *parseComparison(Parser *parser) {
+    UR_Expr *exp = parseTerm(parser);
 
     while (peekToken(parser->lex).type == TOK_DOUBLEEQUAL) {
         int op = parseBinop(parser);
-        Expr *right = parseTerm(parser);
-        Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
+        UR_Expr *right = parseTerm(parser);
+        UR_Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
         newExpr->binop.exp1 = exp;
         newExpr->binop.exp2 = right;
         newExpr->binop.op = op;
-        newExpr->typeExpr = NULL;
+
         exp = newExpr;
     }
 
     return exp;
 }
 
-Expr *parseBoolean(Parser *parser) {
-    Expr *exp = parseComparison(parser);
+UR_Expr *parseBoolean(Parser *parser) {
+    UR_Expr *exp = parseComparison(parser);
 
     while (peekToken(parser->lex).type == TOK_AND ||
            peekToken(parser->lex).type == TOK_OR) {
         int op = parseBinop(parser);
-        Expr *right = parseComparison(parser);
-        Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
+        UR_Expr *right = parseComparison(parser);
+        UR_Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
         newExpr->binop.exp1 = exp;
         newExpr->binop.exp2 = right;
         newExpr->binop.op = op;
-        newExpr->typeExpr = NULL;
         exp = newExpr;
     }
 
     return exp;
 }
 
-Expr *parseExpr(Parser *parser) { return parseBoolean(parser); }
+UR_Expr *parseExpr(Parser *parser) { return parseBoolean(parser); }
 
-static Stmt *parseDec(Parser *parser, Token nameTok, bool isMut) {
-    Type *type;
-
-    type = parseType(parser);
+static UR_Stmt *parseDec(Parser *parser, Token nameTok, bool isMut) {
+    UR_Type *type = parseType(parser);
 
     Token prev = parser->lex->previousTok;
 
@@ -523,12 +493,12 @@ static Stmt *parseDec(Parser *parser, Token nameTok, bool isMut) {
     Token equalTok = nextToken(parser->lex);
 
     if (equalTok.type == TOK_EQUAL) {
-        Expr *exp = parseExpr(parser);
+        UR_Expr *exp = parseExpr(parser);
 
         prev = parser->lex->previousTok;
 
         Token endingTok = nextToken(parser->lex);
-        Stmt *stmt;
+        UR_Stmt *stmt;
 
         if (endingTok.type == TOK_SEMICOLON) {
             stmt = stmtFromTwoPoints(nameTok.start, endingTok.end,
@@ -557,12 +527,12 @@ static Stmt *parseDec(Parser *parser, Token nameTok, bool isMut) {
         }
 
         stmt->dec_assign.type = type;
-        stmt->dec_assign.var = entry;
+        stmt->dec_assign.entry = entry;
         stmt->dec_assign.value = exp;
         return stmt;
     }
 
-    Stmt *stmt;
+    UR_Stmt *stmt;
     if (equalTok.type == TOK_SEMICOLON) {
         stmt = stmtFromTwoPoints(nameTok.start, equalTok.end, STMT_DEC);
     } else if (equalTok.type == TOK_NEWLINE) {
@@ -589,14 +559,14 @@ static Stmt *parseDec(Parser *parser, Token nameTok, bool isMut) {
         printErrors();
     }
 
-    stmt->dec.var = entry;
+    stmt->dec.entry = entry;
     return stmt;
 }
 
-Stmt *parseInferredDec(Parser *parser, Token varTok, bool isMut) {
-    Expr *value = parseExpr(parser);
+UR_Stmt *parseInferredDec(Parser *parser, Token varTok, bool isMut) {
+    UR_Expr *value = parseExpr(parser);
 
-    Stmt *stmt;
+    UR_Stmt *stmt;
 
     Token semicolonTok = nextToken(parser->lex);
     if (semicolonTok.type == TOK_SEMICOLON) {
@@ -624,56 +594,53 @@ Stmt *parseInferredDec(Parser *parser, Token varTok, bool isMut) {
         printErrors();
     }
 
-    stmt->dec_assign.var = entry;
+    stmt->dec_assign.entry = entry;
 
     return stmt;
 }
 
-Stmt *parseAssignment(Parser *parser, Token symTok) {
-    Expr *value = parseExpr(parser);
+UR_Stmt *parseAssignment(Parser *parser, Token symTok) {
+    UR_Expr *value = parseExpr(parser);
 
     Token semiTok = nextToken(parser->lex);
-    if (semiTok.type != TOK_SEMICOLON) {
+
+    UR_Stmt *ret;
+    if (semiTok.type == TOK_SEMICOLON) {
+        ret = stmtFromTwoPoints(symTok.start, semiTok.end, STMT_ASSIGN);
+    } else if (semiTok.type == TOK_NEWLINE) {
+        ret = stmtFromTwoPoints(symTok.start, value->end, STMT_ASSIGN);
+    } else {
         queueError(msprintf("Expected ';' after expression in assignment"),
                    semiTok.start, semiTok.end);
         printErrors();
-    }
-    Stmt *ret = stmtFromTwoPoints(symTok.start, semiTok.end, STMT_ASSIGN);
-
-    HashEntry *entry = findInScope(parser->currentScope, symTok.sym);
-
-    if (entry == NULL) {
-        queueError(msprintf("Cannot find variable: '%.*s' in scope",
-                            symTok.sym.len, (char *)symTok.sym.text),
-                   ret->start, ret->end);
-        printErrors();
+        exit(1);
     }
 
-    ret->assign.var = entry;
+    ret->assign.name = symTok.sym;
     ret->assign.value = value;
     return ret;
 }
 
-Stmt *parseReturn(Parser *parser, Token firstTok) {
+UR_Stmt *parseReturn(Parser *parser, Token firstTok) {
     Token semiTok = peekToken(parser->lex);
 
     if (semiTok.type == TOK_SEMICOLON) {
-        Stmt *stmt =
+        UR_Stmt *stmt =
             stmtFromTwoPoints(firstTok.start, semiTok.end, STMT_RETURN);
         stmt->returnExp = NULL;
         nextToken(parser->lex);
         return stmt;
     } else if (semiTok.type == TOK_NEWLINE) {
-        Stmt *stmt =
+        UR_Stmt *stmt =
             stmtFromTwoPoints(firstTok.start, semiTok.end, STMT_RETURN);
         stmt->returnExp = NULL;
         nextToken(parser->lex);
         return stmt;
     }
 
-    Expr *returnExp = parseExpr(parser);
+    UR_Expr *returnExp = parseExpr(parser);
 
-    Stmt *stmt;
+    UR_Stmt *stmt;
     semiTok = nextToken(parser->lex);
     if (semiTok.type == TOK_SEMICOLON) {
         stmt = stmtFromTwoPoints(firstTok.start, semiTok.end, STMT_RETURN);
@@ -690,7 +657,7 @@ Stmt *parseReturn(Parser *parser, Token firstTok) {
     return stmt;
 }
 
-Stmt *parseStmt(Parser *parser) {
+UR_Stmt *parseStmt(Parser *parser) {
     Token tok = peekToken(parser->lex);
 
     switch (tok.type) {
@@ -713,7 +680,7 @@ Stmt *parseStmt(Parser *parser) {
                     nextToken(parser->lex);
                     return parseInferredDec(parser, tok, true);
                 default: {
-                    Expr *expr = parseExpr(parser);
+                    UR_Expr *expr = parseExpr(parser);
                     Token semiTok = nextToken(parser->lex);
                     if (semiTok.type != TOK_SEMICOLON) {
                         queueError(
@@ -725,7 +692,7 @@ Stmt *parseStmt(Parser *parser) {
                             continueUntil(parser->lex, TOK_SEMICOLON_BITS);
                     }
 
-                    Stmt *exprStmt =
+                    UR_Stmt *exprStmt =
                         stmtFromTwoPoints(expr->start, semiTok.end, STMT_EXPR);
                     exprStmt->singleExpr = expr;
                     return exprStmt;
@@ -733,7 +700,7 @@ Stmt *parseStmt(Parser *parser) {
             }
         }
         default: {
-            Expr *expr = parseExpr(parser);
+            UR_Expr *expr = parseExpr(parser);
 
             Token semiTok = nextToken(parser->lex);
             if (semiTok.type != TOK_SEMICOLON) {
@@ -744,7 +711,7 @@ Stmt *parseStmt(Parser *parser) {
                 semiTok = continueUntil(parser->lex, TOK_SEMICOLON_BITS);
             }
 
-            Stmt *exprStmt =
+            UR_Stmt *exprStmt =
                 stmtFromTwoPoints(expr->start, semiTok.end, STMT_EXPR);
             exprStmt->singleExpr = expr;
             return exprStmt;
@@ -752,7 +719,7 @@ Stmt *parseStmt(Parser *parser) {
     }
 }
 
-Param parseParam(Scope *scope, Parser *parser) {
+UR_Param parseParam(Scope *scope, Parser *parser) {
     Token symTok = nextToken(parser->lex);
     if (symTok.type != TOK_SYM) {
         queueError("Expected parameter name", symTok.start, symTok.end);
@@ -765,18 +732,19 @@ Param parseParam(Scope *scope, Parser *parser) {
         symTok = continueUntil(parser->lex, TOK_COLON_BITS);
     }
 
-    Type *type = parseType(parser);
+    UR_Type *type = parseType(parser);
 
     Token commaType = peekToken(parser->lex);
     if (commaType.type == TOK_COMMA) {
         nextToken(parser->lex);
     }
-    TypedEntry *entry = calloc(1, sizeof(TypedEntry));
+
+    UnresolvedEntry *entry = calloc(1, sizeof(UnresolvedEntry));
     entry->isMut = false;
     entry->type = type;
 
-    return (Param){.var = insertHashtbl(scope->vars, symTok.sym, entry),
-                   .type = type};
+    return (UR_Param){.entry = insertHashtbl(scope->vars, symTok.sym, entry),
+                      .type = type};
 }
 
 Vector *parseParams(Scope *scope, Parser *parser) {
@@ -795,13 +763,13 @@ Vector *parseParams(Scope *scope, Parser *parser) {
             nextToken(parser->lex);
             return ret;
         } else {
-            Param param = parseParam(scope, parser);
+            UR_Param param = parseParam(scope, parser);
             pushVector(ret, &param);
         }
     }
 }
 
-Function *parseFunction(Parser *parser, Token keywordTok) {
+UR_Function *parseFunction(Parser *parser, Token keywordTok) {
     Token symTok = nextToken(parser->lex);
 
     if (symTok.type != TOK_SYM) {
@@ -825,31 +793,32 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
         arrowTok = continueUntil(parser->lex, TOK_ARROW_BITS);
     }
 
-    Type *retType = parseType(parser);
+    UR_Type *retType = parseType(parser);
 
     if (peekToken(parser->lex).type == TOK_NEWLINE) {
         nextToken(parser->lex);
     }
 
-    Vector *paramTypes = newVector(sizeof(Type *), params->numItems);
+    Vector *paramTypes = newVector(sizeof(UR_Type *), params->numItems);
 
     for (size_t i = 0; i < params->numItems; i++) {
-        Type *paramType = ((Param *)indexVector(params, i))->type;
+        UR_Type *paramType = ((UR_Param *)indexVector(params, i))->type;
         pushVector(paramTypes, &paramType);
     }
 
-    Type *functionType = calloc(1, sizeof(Type));
+    UR_Type *functionType = calloc(1, sizeof(UR_Type));
     functionType->type = TYP_FUN;
     functionType->fun.args = paramTypes;
+
     functionType->fun.retType = retType;
 
-    TypedEntry *funEntry = calloc(1, sizeof(TypedEntry));
+    UnresolvedEntry *funEntry = calloc(1, sizeof(UnresolvedEntry));
     funEntry->isMut = false;
     funEntry->type = functionType;
 
     insertHashtbl(parser->currentScope->vars, symTok.sym, funEntry);
 
-    Vector *stmts = newVector(sizeof(Stmt *), 0);
+    Vector *stmts = newVector(sizeof(UR_Stmt *), 0);
 
     Token endTok;
     for (;;) {
@@ -858,11 +827,11 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
             endTok = nextToken(parser->lex);
             break;
         }
-        Stmt *stmt = parseStmt(parser);
+        UR_Stmt *stmt = parseStmt(parser);
         pushVector(stmts, &stmt);
     }
 
-    Function *fun = calloc(1, sizeof(Function));
+    UR_Function *fun = calloc(1, sizeof(UR_Function));
     fun->name = symTok.sym;
     fun->params = params;
     fun->retType = retType;
@@ -889,7 +858,7 @@ void parseTypeDec(Parser *parser) {
         equalsTok = continueUntil(parser->lex, TOK_EQUAL_BITS);
     }
 
-    Type *type = parseComplexType(parser);
+    UR_Type *type = parseComplexType(parser);
     HashEntry *entry = insertHashtbl(parser->typeTable, symTok.sym, type);
     if (entry == NULL) {
         queueError(msprintf("Cannot rebind name '%.*s' to a type",
@@ -898,12 +867,12 @@ void parseTypeDec(Parser *parser) {
     }
 }
 
-Toplevel parseToplevel(Parser *parser) {
+UR_Toplevel parseToplevel(Parser *parser) {
     Token keywordTok = nextToken(parser->lex);
     switch (keywordTok.type) {
         case TOK_PROC:
-            return (Toplevel){.type = TOP_PROC,
-                              .fn = parseFunction(parser, keywordTok)};
+            return (UR_Toplevel){.type = TOP_PROC,
+                                 .fn = parseFunction(parser, keywordTok)};
         case TOK_TYPE:
             parseTypeDec(parser);
             return parseToplevel(parser);
@@ -932,9 +901,9 @@ static Scope *getGlobalScope(Scope *scope) {
     return scope;
 }
 
-AST *parseSource(Lexer *lex) {
+UR_AST *parseSource(Lexer *lex) {
     Parser parser = newParser(lex);
-    Vector *decs = newVector(sizeof(Toplevel), 0);
+    Vector *decs = newVector(sizeof(UR_Toplevel), 0);
 
     for (;;) {
         Token tok = peekToken(parser.lex);
@@ -944,13 +913,13 @@ AST *parseSource(Lexer *lex) {
                 /* Im sorry djikstra but no named break is a deal breaker */
                 goto done;
             default: {
-                Toplevel top = parseToplevel(&parser);
+                UR_Toplevel top = parseToplevel(&parser);
                 pushVector(decs, &top);
             }
         }
     }
 done : {
-    AST *ret = calloc(1, sizeof(AST));
+    UR_AST *ret = calloc(1, sizeof(UR_AST));
     ret->decs = decs;
     ret->globalScope = getGlobalScope(parser.currentScope);
     return ret;

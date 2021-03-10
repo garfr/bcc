@@ -9,19 +9,25 @@
 //
 //===---------------------------------------------------------------------===//
 
+#include <ast.h>
 #include <lexer.h>
-#include <parser.h>
 #include <tac.h>
+#include <unresolved_ast.h>
 
 /* lexer.h */
 void printToken(Token tok);
 
-/* parser.h */
+/* ast.h */
 void printType(Type *type);
 void printExpr(Expr *exp);
 void printStmt(Stmt *stmt);
 void printAST(AST *ast);
 
+/* unresolved_ast.h */
+void printURType(UR_Type *type);
+void printURExpr(UR_Expr *exp);
+void printURStmt(UR_Stmt *stmt);
+void printURAST(UR_AST *ast);
 /* tac.h */
 void printAddr(TACAddr addr);
 void printOp(TACOp op);

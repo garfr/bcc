@@ -11,10 +11,10 @@
 
 #pragma once
 
-#include <ast.h>
 #include <lexer.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <unresolved_ast.h>
 #include <utils.h>
 
-AST *parseSource(Lexer *lex);
+UR_AST *parseSource(Lexer *lex);

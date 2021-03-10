@@ -13,28 +13,13 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <unresolved_ast.h>
 #include <utils.h>
 
 /* A variant enum representing a compound type expression, which will include
  * arrays, pointers, and user defined records, enums, and tuples later */
 typedef struct Type {
-    enum TypeType {
-        TYP_S8,
-        TYP_S16,
-        TYP_S32,
-        TYP_S64,
-        TYP_U8,
-        TYP_U16,
-        TYP_U32,
-        TYP_U64,
-        TYP_RECORD,
-        TYP_VOID,
-        TYP_INTLIT,
-        TYP_FUN,
-        TYP_BOOL,
-        // A binding of a more complex type to a single name
-        TYP_BINDING,
-    } type;
+    enum TypeType type;
 
     union {
         struct {
@@ -54,14 +39,7 @@ typedef struct Expr {
     size_t start;
     size_t end;
 
-    enum ExprType {
-        EXP_INT,
-        EXP_VAR,
-        EXP_BINOP,
-        EXP_FUNCALL,
-        EXP_BOOL,
-        EXP_RECORDLIT
-    } type;
+    enum ExprType type;
 
     Type *typeExpr;
     union {
@@ -72,15 +50,7 @@ typedef struct Expr {
         struct {
             struct Expr *exp1;
             struct Expr *exp2;
-            enum {
-                BINOP_ADD,
-                BINOP_SUB,
-                BINOP_MULT,
-                BINOP_DIV,
-                BINOP_EQUAL,
-                BINOP_AND,
-                BINOP_OR,
-            } op;
+            enum BinopType op;
         } binop;
 
         struct {
@@ -100,13 +70,7 @@ typedef struct Stmt {
     size_t start;
     size_t end;
 
-    enum StmtType {
-        STMT_DEC,
-        STMT_DEC_ASSIGN,
-        STMT_ASSIGN,
-        STMT_RETURN,
-        STMT_EXPR
-    } type;
+    enum StmtType type;
 
     union {
         struct {
@@ -156,10 +120,7 @@ typedef struct {
 } TypedEntry;
 
 typedef struct {
-    enum {
-        TOP_VAR,
-        TOP_PROC,
-    } type;
+    enum ToplevelType type;
     union {
         Stmt *var;
         Function *fn;
