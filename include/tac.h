@@ -11,7 +11,6 @@
 
 #pragma once
 
-#include <ast.h>
 #include <parser.h>
 #include <stdbool.h>
 #include <utils.h>

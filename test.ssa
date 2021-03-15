@@ -1,8 +1,0 @@
-export function w $main() {
-@start
-    %val1 =w copy 3
-    %t0 =w copy %val1
-    %t0 =w add %t0, 4
-    %val1 =w copy %t0
-    ret %val1
-}

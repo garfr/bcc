@@ -239,5 +239,6 @@ TAC convertAST(AST* ast) {
         convertToplevel(&tac, *((Toplevel*)indexVector(ast->decs, i)));
     }
 
+    tac.codes = fixArithmetic(tac.codes);
     return tac;
 }
