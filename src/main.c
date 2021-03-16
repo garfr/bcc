@@ -28,6 +28,7 @@
 #include <lexer.h>
 #include <parser.h>
 #include <pp.h>
+#include <resolve_names.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -80,6 +81,7 @@ int main(int argc, char *argv[]) {
     Lexer lex = newLexer(mapped_file, file_stats.st_size);
 
     AST *ast = parseSource(&lex);
+    resolveNames(ast);
     annotateAST(ast);
 
     /*printAST(ast);*/

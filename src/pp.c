@@ -223,8 +223,8 @@ void printExpr(Expr *exp) {
             printf(")");
             break;
         case EXP_FUNCALL: {
-            printf("EXP_FUNCALL: %.*s(", (int)exp->funcall.name->id.len,
-                   exp->funcall.name->id.text);
+            printf("EXP_FUNCALL: %.*s(", (int)exp->funcall.name.len,
+                   exp->funcall.name.text);
             for (size_t i = 0; i < exp->funcall.arguments->numItems; i++) {
                 printExpr(*((Expr **)indexVector(exp->funcall.arguments, i)));
             }

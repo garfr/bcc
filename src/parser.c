@@ -106,6 +106,7 @@ Stmt *stmtFromTwoPoints(size_t start, size_t end, enum StmtType type) {
 }
 
 static HashEntry *addToScope(Scope *scope, Symbol sym, bool isMut) {
+    printf("Added %.*s\n", sym.len, sym.text);
     TypedEntry *entry = calloc(1, sizeof(TypedEntry));
     entry->isMut = isMut;
     entry->type = NULL;
@@ -270,13 +271,7 @@ Type *parseComplexType(Parser *parser) {
 Expr *parseExpr(Parser *parser);
 
 Expr *parseFuncall(Parser *parser, Token symTok) {
-    HashEntry *value = findInScope(parser->currentScope, symTok.sym);
-    if (value == NULL) {
-        queueError(msprintf("Cannot find variable '%.*s' in scope",
-                            symTok.sym.len, symTok.sym.text),
-                   symTok.start, symTok.end);
-        printErrors();
-    }
+    HashEntry *entry = findInScope(parser->currentScope, symTok.sym);
 
     Vector *args = newVector(sizeof(Expr *), 0);
 
@@ -290,9 +285,15 @@ Expr *parseFuncall(Parser *parser, Token symTok) {
     Expr *funcall = calloc(1, sizeof(Expr));
     funcall->type = EXP_FUNCALL;
     funcall->funcall.arguments = args;
-    funcall->funcall.name = value;
     funcall->start = symTok.start;
-    funcall->typeExpr = ((TypedEntry *)value->data)->type->fun.retType;
+    funcall->funcall.name = symTok.sym;
+    if (entry != NULL) {
+        funcall->funcall.entry = entry;
+        funcall->typeExpr = ((TypedEntry *)entry->data)->type->fun.retType;
+    } else {
+        printf("Forward dec\n");
+    }
+
     funcall->end = endTok.end;
     return funcall;
 }
@@ -847,7 +848,7 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
     funEntry->isMut = false;
     funEntry->type = functionType;
 
-    insertHashtbl(parser->currentScope->vars, symTok.sym, funEntry);
+    insertHashtbl(parser->currentScope->upScope->vars, symTok.sym, funEntry);
 
     Vector *stmts = newVector(sizeof(Stmt *), 0);
 

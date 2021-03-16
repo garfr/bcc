@@ -241,7 +241,7 @@ void typeExpression(Scope* scope, Expr* exp) {
 
     switch (exp->type) {
         case EXP_FUNCALL: {
-            Type* fun = ((TypedEntry*)exp->funcall.name->data)->type;
+            Type* fun = ((TypedEntry*)exp->funcall.entry->data)->type;
             if (fun->fun.args->numItems != exp->funcall.arguments->numItems) {
                 queueError(msprintf("Function call has %zd arguments, but %zd "
                                     "were expected",

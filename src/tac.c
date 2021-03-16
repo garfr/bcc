@@ -106,12 +106,12 @@ TACAddr convertExpr(TAC* tac, Expr* expr) {
             }
 
             TACInst* callInst = newInstruction(OP_CALL);
-            callInst->op.args[0] = (TACAddr){
-                .type = ADDR_TAG,
-                .tag = findHashtbl(tac->tags, expr->funcall.name->id)};
+            callInst->op.args[0] =
+                (TACAddr){.type = ADDR_TAG,
+                          .tag = findHashtbl(tac->tags, expr->funcall.name)};
             callInst->op.args[1] = (TACAddr){.type = ADDR_EMPTY, {}};
             TACAddr ret = newTemp(
-                ((TypedEntry*)expr->funcall.name->data)->type->fun.retType);
+                ((TypedEntry*)expr->funcall.entry->data)->type->fun.retType);
             callInst->op.args[2] = ret;
             pushVector(tac->codes, &callInst);
             return ret;

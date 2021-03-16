@@ -84,8 +84,10 @@ typedef struct Expr {
         } binop;
 
         struct {
-            HashEntry *name;
+            HashEntry *entry;
             Vector *arguments;  // Expr*
+            Symbol name;        // This is kept so function declarations can be
+                                // resolved without forward declarations
         } funcall;
 
         struct {
