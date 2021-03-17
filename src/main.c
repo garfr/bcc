@@ -119,6 +119,8 @@ int main(int argc, char *argv[]) {
                                 outputname)) == 0) {
                 system(msprintf("gcc %s.s -o %s", outputname, outputname));
                 system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+            } else {
+                system(msprintf("rm %s.ssa", outputname, outputname));
             }
         } else {
             FILE *file = fopen("temp.temp.temp.ssa", "w");
@@ -126,6 +128,9 @@ int main(int argc, char *argv[]) {
             fclose(file);
             if (system("./qbe temp.temp.temp.ssa") == 0) {
                 system("rm temp.temp.temp.ssa");
+            } else {
+                system(
+                    msprintf("rm temp.temp.temp.ssa", outputname, outputname));
             }
         }
     } else {
@@ -138,6 +143,8 @@ int main(int argc, char *argv[]) {
                                 outputname)) == 0) {
                 system(msprintf("gcc %s.s -o %s", outputname, outputname));
                 system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+            } else {
+                system(msprintf("rm %s.ssa %s.s", outputname, outputname));
             }
         } else {
             FILE *file = fopen(outputname, "w");
@@ -148,6 +155,8 @@ int main(int argc, char *argv[]) {
                                 outputname)) == 0) {
                 system(msprintf("gcc %s.s -o %s -c", outputname, outputname));
                 system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+            } else {
+                system(msprintf("rm %s.ssa", outputname, outputname));
             }
         }
     }
