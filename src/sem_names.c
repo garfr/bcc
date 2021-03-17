@@ -5,7 +5,7 @@
 #include "bcc/utils.h"
 #include "bcc/ast.h"
 #include "bcc/error.h"
-#include "bcc/resolve_names.h"
+#include "bcc/sem_names.h"
 // clang-format on 
 
 void resolveExpr(Scope *scope, Expr *exp) {
