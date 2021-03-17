@@ -13,8 +13,7 @@
 #include "bcc/lexer.h"
 #include "bcc/error.h"
 #include "bcc/parser.h"
-#include "bcc/sem_names.h"
-#include "bcc/sem_types.h"
+#include "bcc/semantics.h"
 #include "bcc/codegen.h"
 // clang-format on 
 

@@ -6,7 +6,7 @@
 #include "bcc/ast.h"
 #include "bcc/error.h"
 #include "bcc/utils.h"
-#include "bcc/sem_types.h"
+#include "bcc/semantics.h"
 // clang-format off
 
 /* Don't allocate the same type every time when using integer literals, just
