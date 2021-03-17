@@ -30,12 +30,12 @@
 #include <parser.h>
 #include <pp.h>
 #include <resolve_names.h>
+#include <sem_types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <types.h>
 #include <unistd.h>
 
 int main(int argc, char *argv[]) {
