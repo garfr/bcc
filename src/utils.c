@@ -91,9 +91,11 @@ Hashtbl *newHashtbl(size_t initBuckets) {
 size_t spow(size_t base, size_t exp) {
     size_t result = 1;
     for (;;) {
-        if (exp & 1) result *= base;
+        if (exp & 1)
+            result *= base;
         exp >>= 1;
-        if (!exp) break;
+        if (!exp)
+            break;
         base *= base;
     }
 

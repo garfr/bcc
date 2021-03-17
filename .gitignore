@@ -7,3 +7,8 @@ objs/
 bcc
 a.out
 main
+qbe
+qbe/
+test
+*.ssa
+*.s

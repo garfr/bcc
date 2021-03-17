@@ -11,7 +11,6 @@
 
 #include <lexer.h>
 #include <parser.h>
-#include <tac.h>
 
 /* lexer.h */
 void printToken(Token tok);
@@ -21,9 +20,3 @@ void printType(Type *type);
 void printExpr(Expr *exp);
 void printStmt(Stmt *stmt);
 void printAST(AST *ast);
-
-/* tac.h */
-void printAddr(TACAddr addr);
-void printOp(TACOp op);
-void printInst(TACInst *inst);
-void printTAC(TAC *tac);

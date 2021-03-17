@@ -106,7 +106,6 @@ Stmt *stmtFromTwoPoints(size_t start, size_t end, enum StmtType type) {
 }
 
 static HashEntry *addToScope(Scope *scope, Symbol sym, bool isMut) {
-    printf("Added %.*s\n", sym.len, sym.text);
     TypedEntry *entry = calloc(1, sizeof(TypedEntry));
     entry->isMut = isMut;
     entry->type = NULL;
@@ -152,66 +151,65 @@ Type *parseType(Parser *parser) {
         tok = continueUntil(parser->lex, TOK_SYM_BITS);
     }
     switch (tok.type) {
-        case TOK_SYM:
-            switch (tok.sym.text[0]) {
-                case 's':
-                    ret = calloc(1, sizeof(Type));
-                    switch (convertSymbolInt(tok)) {
-                        case 8:
-                            ret->type = TYP_S8;
-                            break;
-                        case 16:
-                            ret->type = TYP_S16;
-                            break;
-                        case 32:
-                            ret->type = TYP_S32;
-                            break;
-                        case 64:
-                            ret->type = TYP_S64;
-                            break;
-                    }
-                    return ret;
-                case 'u':
-                    ret = calloc(1, sizeof(Type));
-                    switch (convertSymbolInt(tok)) {
-                        case 8:
-                            ret->type = TYP_U8;
-                            break;
-                        case 16:
-                            ret->type = TYP_U16;
-                            break;
-                        case 32:
-                            ret->type = TYP_U32;
-                            break;
-                        case 64:
-                            ret->type = TYP_U64;
-                            break;
-                    }
-                    return ret;
-                default: {
-                    HashEntry *entry = findHashtbl(parser->typeTable, tok.sym);
-                    if (entry == NULL) {
-                        queueError(
-                            msprintf("Could not find a type with name %.*s",
-                                     (int)tok.sym.len, tok.sym.text),
-                            tok.start, tok.end);
-                        printErrors();
-                    }
-                    ret = calloc(1, sizeof(Type));
-                    ret->type = TYP_BINDING;
-                    ret->typeEntry = entry;
-                    return ret;
-                }
+    case TOK_SYM:
+        switch (tok.sym.text[0]) {
+        case 's':
+            ret = calloc(1, sizeof(Type));
+            switch (convertSymbolInt(tok)) {
+            case 8:
+                ret->type = TYP_S8;
+                break;
+            case 16:
+                ret->type = TYP_S16;
+                break;
+            case 32:
+                ret->type = TYP_S32;
+                break;
+            case 64:
+                ret->type = TYP_S64;
+                break;
             }
-            break;
-        case TOK_VOID:
-            return VoidType;
-        case TOK_BOOL:
-            return BooleanType;
+            return ret;
+        case 'u':
+            ret = calloc(1, sizeof(Type));
+            switch (convertSymbolInt(tok)) {
+            case 8:
+                ret->type = TYP_U8;
+                break;
+            case 16:
+                ret->type = TYP_U16;
+                break;
+            case 32:
+                ret->type = TYP_U32;
+                break;
+            case 64:
+                ret->type = TYP_U64;
+                break;
+            }
+            return ret;
+        default: {
+            HashEntry *entry = findHashtbl(parser->typeTable, tok.sym);
+            if (entry == NULL) {
+                queueError(msprintf("Could not find a type with name %.*s",
+                                    (int)tok.sym.len, tok.sym.text),
+                           tok.start, tok.end);
+                printErrors();
+            }
+            ret = calloc(1, sizeof(Type));
+            ret->type = TYP_BINDING;
+            ret->typeEntry = entry;
+            return ret;
+        }
+        }
+        break;
+    case TOK_VOID:
+        return VoidType;
+    case TOK_BOOL:
+        return BooleanType;
 
-        default:
-            assert(false);
-            return NULL;
+    default:
+        assert(false);
+        return NULL;
     }
 }
 
@@ -290,8 +288,6 @@ Expr *parseFuncall(Parser *parser, Token symTok) {
     if (entry != NULL) {
         funcall->funcall.entry = entry;
         funcall->typeExpr = ((TypedEntry *)entry->data)->type->fun.retType;
-    } else {
-        printf("Forward dec\n");
     }
 
     funcall->end = endTok.end;
@@ -358,85 +354,83 @@ Expr *parsePrimary(Parser *parser) {
 
     Token tok = nextToken(parser->lex);
     switch (tok.type) {
-        case TOK_INT:
-            ret = exprFromToken(tok, EXP_INT);
-            ret->intlit = tok.intnum;
-            ret->typeExpr = NULL;
-            return ret;
-        case TOK_SYM:
+    case TOK_INT:
+        ret = exprFromToken(tok, EXP_INT);
+        ret->intlit = tok.intnum;
+        ret->typeExpr = NULL;
+        return ret;
+    case TOK_SYM:
 
-            switch (peekToken(parser->lex).type) {
-                case TOK_LPAREN:
-                    nextToken(parser->lex);
-                    return parseFuncall(parser, tok);
-                case TOK_LBRACKET:
-                    nextToken(parser->lex);
-                    return parseRecordLit(parser, tok);
-
-                default:
-                    ret = exprFromToken(tok, EXP_VAR);
-
-                    HashEntry *entry =
-                        findInScope(parser->currentScope, tok.sym);
-                    if (entry == NULL) {
-                        queueError(
-                            msprintf("Cannot find variable: '%.*s' in any "
-                                     "scope. Must be undeclared",
-                                     tok.sym.len, (char *)tok.sym.text),
-                            tok.start, tok.end);
-                        /* Must fail */
-                        printErrors();
-                    }
-
-                    ret->var = entry;
-                    ret->typeExpr = NULL;
-                    return ret;
-            }
-        case TOK_FALSE:
-            ret = exprFromToken(tok, EXP_BOOL);
-            ret->boolean = false;
-            ret->typeExpr = NULL;
-            return ret;
-        case TOK_TRUE:
-            ret = exprFromToken(tok, EXP_BOOL);
-            ret->boolean = true;
-            ret->typeExpr = NULL;
-            return ret;
+        switch (peekToken(parser->lex).type) {
+        case TOK_LPAREN:
+            nextToken(parser->lex);
+            return parseFuncall(parser, tok);
+        case TOK_LBRACKET:
+            nextToken(parser->lex);
+            return parseRecordLit(parser, tok);
 
         default:
-            printToken(tok);
-            printToken(nextToken(parser->lex));
-            queueError(msprintf("Expected an integer or variable name for "
-                                "expressions, not another token"),
-                       tok.start, tok.end);
-            printErrors();
-            /* This never gets called */ exit(1);
+            ret = exprFromToken(tok, EXP_VAR);
+
+            HashEntry *entry = findInScope(parser->currentScope, tok.sym);
+            if (entry == NULL) {
+                queueError(msprintf("Cannot find variable: '%.*s' in any "
+                                    "scope. Must be undeclared",
+                                    tok.sym.len, (char *)tok.sym.text),
+                           tok.start, tok.end);
+                /* Must fail */
+                printErrors();
+            }
+
+            ret->var = entry;
+            ret->typeExpr = NULL;
+            return ret;
+        }
+    case TOK_FALSE:
+        ret = exprFromToken(tok, EXP_BOOL);
+        ret->boolean = false;
+        ret->typeExpr = NULL;
+        return ret;
+    case TOK_TRUE:
+        ret = exprFromToken(tok, EXP_BOOL);
+        ret->boolean = true;
+        ret->typeExpr = NULL;
+        return ret;
+
+    default:
+        printToken(tok);
+        printToken(nextToken(parser->lex));
+        queueError(msprintf("Expected an integer or variable name for "
+                            "expressions, not another token"),
+                   tok.start, tok.end);
+        printErrors();
+        /* This never gets called */ exit(1);
     }
 }
 
 int parseBinop(Parser *parser) {
     Token tok = nextToken(parser->lex);
     switch (tok.type) {
-        case TOK_PLUS:
-            return BINOP_ADD;
-        case TOK_MINUS:
-            return BINOP_SUB;
-        case TOK_STAR:
-            return BINOP_MULT;
-        case TOK_SLASH:
-            return BINOP_DIV;
-        case TOK_DOUBLEEQUAL:
-            return BINOP_EQUAL;
-        case TOK_AND:
-            return BINOP_AND;
-        case TOK_OR:
-            return BINOP_OR;
-        default:
-            queueError(msprintf("Expected arithmetic operation"), tok.start,
-                       tok.end);
-            /* This doesn't need to fail but idc */
-            printErrors();
-            exit(1);
+    case TOK_PLUS:
+        return BINOP_ADD;
+    case TOK_MINUS:
+        return BINOP_SUB;
+    case TOK_STAR:
+        return BINOP_MULT;
+    case TOK_SLASH:
+        return BINOP_DIV;
+    case TOK_DOUBLEEQUAL:
+        return BINOP_EQUAL;
+    case TOK_AND:
+        return BINOP_AND;
+    case TOK_OR:
+        return BINOP_OR;
+    default:
+        queueError(msprintf("Expected arithmetic operation"), tok.start,
+                   tok.end);
+        /* This doesn't need to fail but idc */
+        printErrors();
+        exit(1);
     }
 }
 
@@ -537,10 +531,9 @@ static Stmt *parseDec(Parser *parser, Token nameTok, bool isMut) {
         } else if (endingTok.type == TOK_NEWLINE) {
             stmt = stmtFromTwoPoints(nameTok.start, prev.end, STMT_DEC_ASSIGN);
         } else {
-            queueError(
-                "Expected ';', '=', or newline after type in a variable "
-                "declaration",
-                endingTok.start, endingTok.end);
+            queueError("Expected ';', '=', or newline after type in a variable "
+                       "declaration",
+                       endingTok.start, endingTok.end);
             printErrors();
             exit(1);
         }
@@ -569,10 +562,9 @@ static Stmt *parseDec(Parser *parser, Token nameTok, bool isMut) {
     } else if (equalTok.type == TOK_NEWLINE) {
         stmt = stmtFromTwoPoints(nameTok.start, prev.end, STMT_DEC);
     } else {
-        queueError(
-            "Expected ';', '=', or newline after type in a variable "
-            "declaration",
-            nameTok.start, equalTok.end);
+        queueError("Expected ';', '=', or newline after type in a variable "
+                   "declaration",
+                   nameTok.start, equalTok.end);
         printErrors();
         exit(1);
     }
@@ -695,53 +687,32 @@ Stmt *parseStmt(Parser *parser) {
     Token tok = peekToken(parser->lex);
 
     switch (tok.type) {
-        case TOK_RETURN:
+    case TOK_RETURN:
+        nextToken(parser->lex);
+        return parseReturn(parser, tok);
+    case TOK_SYM: {
+        Token equalsTok = lookaheadToken(parser->lex);
+        switch (equalsTok.type) {
+        case TOK_EQUAL:
             nextToken(parser->lex);
-            return parseReturn(parser, tok);
-        case TOK_SYM: {
-            Token equalsTok = lookaheadToken(parser->lex);
-            switch (equalsTok.type) {
-                case TOK_EQUAL:
-                    nextToken(parser->lex);
-                    nextToken(parser->lex);
-                    return parseAssignment(parser, tok);
-                case TOK_COLON:
-                    nextToken(parser->lex);
-                    nextToken(parser->lex);
-                    return parseDec(parser, tok, true);
-                case TOK_COLONEQUAL:
-                    nextToken(parser->lex);
-                    nextToken(parser->lex);
-                    return parseInferredDec(parser, tok, true);
-                default: {
-                    Expr *expr = parseExpr(parser);
-                    Token semiTok = nextToken(parser->lex);
-                    if (semiTok.type != TOK_SEMICOLON) {
-                        queueError(
-                            "Expected ';' after expression parsed as a "
-                            "standalone "
-                            "statement",
-                            expr->start, semiTok.end);
-                        semiTok =
-                            continueUntil(parser->lex, TOK_SEMICOLON_BITS);
-                    }
-
-                    Stmt *exprStmt =
-                        stmtFromTwoPoints(expr->start, semiTok.end, STMT_EXPR);
-                    exprStmt->singleExpr = expr;
-                    return exprStmt;
-                }
-            }
-        }
+            nextToken(parser->lex);
+            return parseAssignment(parser, tok);
+        case TOK_COLON:
+            nextToken(parser->lex);
+            nextToken(parser->lex);
+            return parseDec(parser, tok, true);
+        case TOK_COLONEQUAL:
+            nextToken(parser->lex);
+            nextToken(parser->lex);
+            return parseInferredDec(parser, tok, true);
         default: {
             Expr *expr = parseExpr(parser);
-
             Token semiTok = nextToken(parser->lex);
             if (semiTok.type != TOK_SEMICOLON) {
-                queueError(
-                    "Expected ';' after expression parsed as a standalone "
-                    "statement",
-                    expr->start, semiTok.end);
+                queueError("Expected ';' after expression parsed as a "
+                           "standalone "
+                           "statement",
+                           expr->start, semiTok.end);
                 semiTok = continueUntil(parser->lex, TOK_SEMICOLON_BITS);
             }
 
@@ -750,6 +721,23 @@ Stmt *parseStmt(Parser *parser) {
             exprStmt->singleExpr = expr;
             return exprStmt;
         }
+        }
+    }
+    default: {
+        Expr *expr = parseExpr(parser);
+
+        Token semiTok = nextToken(parser->lex);
+        if (semiTok.type != TOK_SEMICOLON) {
+            queueError("Expected ';' after expression parsed as a standalone "
+                       "statement",
+                       expr->start, semiTok.end);
+            semiTok = continueUntil(parser->lex, TOK_SEMICOLON_BITS);
+        }
+
+        Stmt *exprStmt = stmtFromTwoPoints(expr->start, semiTok.end, STMT_EXPR);
+        exprStmt->singleExpr = expr;
+        return exprStmt;
+    }
     }
 }
 
@@ -902,16 +890,16 @@ void parseTypeDec(Parser *parser) {
 Toplevel parseToplevel(Parser *parser) {
     Token keywordTok = nextToken(parser->lex);
     switch (keywordTok.type) {
-        case TOK_PROC:
-            return (Toplevel){.type = TOP_PROC,
-                              .fn = parseFunction(parser, keywordTok)};
-        case TOK_TYPE:
-            parseTypeDec(parser);
-            return parseToplevel(parser);
-        default:
-            printToken(keywordTok);
-            printf("Internal compiler error: No global vars yet. 1\n");
-            exit(1);
+    case TOK_PROC:
+        return (Toplevel){.type = TOP_PROC,
+                          .fn = parseFunction(parser, keywordTok)};
+    case TOK_TYPE:
+        parseTypeDec(parser);
+        return parseToplevel(parser);
+    default:
+        printToken(keywordTok);
+        printf("Internal compiler error: No global vars yet. 1\n");
+        exit(1);
     }
 }
 
@@ -928,7 +916,7 @@ static Parser newParser(Lexer *lex) {
 /* Traverses to the top of a lexical scope */
 static Scope *getGlobalScope(Scope *scope) {
     for (; scope->upScope != NULL; scope = scope->upScope)
-        ;  // NOOP
+        ; // NOOP
 
     return scope;
 }
@@ -941,13 +929,13 @@ AST *parseSource(Lexer *lex) {
         Token tok = peekToken(parser.lex);
 
         switch (tok.type) {
-            case TOK_EOF:
-                /* Im sorry djikstra but no named break is a deal breaker */
-                goto done;
-            default: {
-                Toplevel top = parseToplevel(&parser);
-                pushVector(decs, &top);
-            }
+        case TOK_EOF:
+            /* Im sorry djikstra but no named break is a deal breaker */
+            goto done;
+        default: {
+            Toplevel top = parseToplevel(&parser);
+            pushVector(decs, &top);
+        }
         }
     }
 done : {

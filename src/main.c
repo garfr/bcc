@@ -22,6 +22,7 @@
 //
 //===---------------------------------------------------------------------===//
 
+#include <codegen.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -34,7 +35,6 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <tac.h>
 #include <types.h>
 #include <unistd.h>
 
@@ -90,18 +90,6 @@ int main(int argc, char *argv[]) {
         printErrors();
     }
 
-    TAC tac = convertAST(ast);
-
-    printTAC(&tac);
-
-    if (errorsExist()) {
-        printErrors();
-    }
-
-    /*generateCode(&tac, ast->globalScope->vars, stdout);*/
-
-    if (errorsExist()) {
-        printErrors();
-    }
+    generateCode(ast);
 }
 
