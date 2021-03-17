@@ -10,13 +10,8 @@ SRC_FILES=$(wildcard $(SRC_DIR)/*.c)
 OBJ_FILES=$(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRC_FILES))
 DEP = $(addsuffix .d,$(OBJ))
 
-bcc: $(OBJ_FILES) 
+all: $(OBJ_FILES) 
 	$(CC) $(LDFLAGS) -o $@ $^
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
-
-test: bcc test.bns
-	./bcc test.bns > test.ssa
-	./qbe test.ssa -o test.s
-	gcc test.s -o test
