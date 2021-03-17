@@ -1,7 +1,7 @@
-#include "codegen.h"
-
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "bcc/codegen.h"
 
 const char *generateType(Type *type) {
 

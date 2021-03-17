@@ -1,26 +1,13 @@
-//===---------- types.c - Defines semantics and annotates the AST --------===//
-//
-// Part of BCC, which is MIT licensed
-// See https//opensource.org/licenses/MIT
-//
-//===----------------------------- About ---------------------------------===//
-//
-// This file defines the semantics and rules of both builtin and user defined
-// types, and provides the functionality for traversing and annotating the AST.
-//
-//===------------------------------ Todo ---------------------------------===//
-//
-// * Find a better way to handle errors here
-//
-//===---------------------------------------------------------------------===//
-
 #include <assert.h>
-#include <ast.h>
-#include <error.h>
-#include <sem_types.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <utils.h>
+
+// clang-format off
+#include "bcc/ast.h"
+#include "bcc/error.h"
+#include "bcc/utils.h"
+#include "bcc/sem_types.h"
+// clang-format off
 
 /* Don't allocate the same type every time when using integer literals, just
  * point to this */

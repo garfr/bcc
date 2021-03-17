@@ -1,42 +1,22 @@
-//===--------------- main.c - The home of BCC -------------------===//
-//
-// Part of BCC, which is MIT licensed See https//opensource.org/licenses/MIT
-//
-//===----------------------------- About ---------------------------------===//
-//
-// BCC is organized like many other compilers.
-// First, a source file is tokenized and parsed into an AST by the parser.
-// Then, after semantic analysis ensuring the structure of the program, the AST
-// is translated into a lower level IR, in this case a three address code.
-// Finally, this IR is analyzed is translated into the output of the compiler,
-// assembly in the Intel format, designed for NASM
-//
-//===------------------------------ Todo ---------------------------------===//
-//
-// Local to this file:
-//
-// * Improve IO
-// * Better error messages
-//
-// For larger scale "todos" see todo.md in the main directory of the project
-//
-//===---------------------------------------------------------------------===//
-
-#include <codegen.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
-#include <lexer.h>
-#include <parser.h>
-#include <pp.h>
-#include <resolve_names.h>
-#include <sem_types.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+// clang-format off
+#include "bcc/pp.h"
+#include "bcc/lexer.h"
+#include "bcc/error.h"
+#include "bcc/parser.h"
+#include "bcc/resolve_names.h"
+#include "bcc/sem_types.h"
+#include "bcc/codegen.h"
+// clang-format on 
 
 int main(int argc, char *argv[]) {
     opterr = 0;

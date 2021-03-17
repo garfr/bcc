@@ -1,19 +1,10 @@
-//===-------------- pp.h - Pretty printing -----------------===//
-//
-// Part of BCC, which is MIT licensed
-// See https//opensource.org/licenses/MIT
-//
-//===----------------------------- About ---------------------------------===//
-//
-// Contains functions for pretty printing the public types, decluttering a lot
-// of source files.
-//
-//===---------------------------------------------------------------------===//
-
-#include <lexer.h>
-#include <parser.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+// clang-format off
+#include "bcc/lexer.h"
+#include "bcc/parser.h"
+// clang-format on
 
 void printToken(Token tok) {
     switch (tok.type) {

@@ -1,23 +1,12 @@
-//===------------ resolve_names.c - Resolve scopes and names -------------===//
-//
-// Part of BCC, which is MIT licensed
-// See https//opensource.org/licenses/MIT
-//
-//===----------------------------- About ---------------------------------===//
-//
-// This resolves the names of function calls, types, and records members that
-// could not be resolved during parsing, signaling errors if needed.
-//
-//===------------------------------ Todo ---------------------------------===//
-//
-//===---------------------------------------------------------------------===//
-
-#include <ast.h>
-#include <error.h>
-#include <resolve_names.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <utils.h>
+
+// clang-format off
+#include "bcc/utils.h"
+#include "bcc/ast.h"
+#include "bcc/error.h"
+#include "bcc/resolve_names.h"
+// clang-format on 
 
 void resolveExpr(Scope *scope, Expr *exp) {
     switch (exp->type) {

@@ -1,26 +1,10 @@
-//===---------- utils.c - Utility functions and data structures -----------===/
-//
-// Part of BCC, which is MIT licensed
-// See https//opensource.org/licenses/MIT
-//
-//===----------------------------- About ----------------------------------===/
-//
-// This file provides several helper data structures and functions, including a
-// generic hashtbl, vector, and a general purpose Symbol type
-//
-//===------------------------------ Todo ----------------------------------===/
-//
-// * Make the hashtable completely generic and provide type safe wrappers
-// * Provide type safe wrappers for the vector implementation
-//
-//===----------------------------------------------------------------------===/
-
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <utils.h>
+
+#include "bcc/utils.h"
 
 /* ------------------------------ Helpers ---------------------------------- */
 

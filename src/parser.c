@@ -1,32 +1,16 @@
-//===----------- parser.c - Parses a source file into an AST -------------===//
-//
-// Part of BCC, which is MIT licensed
-// See https//opensource.org/licenses/MIT
-//
-//===----------------------------- About ---------------------------------===//
-//
-// Using a lexer, this parses a source file into the AST described in parser.h.
-// It is designed to continue for as long as possible after an error until it is
-// no longer possible to continue.
-// It also performs type checking while parsing, although this will probably be
-// given its own phase soon.
-//
-//===------------------------------ Todo ---------------------------------===//
-//
-// * Continue parsing for even longer after errors occur
-//
-//===---------------------------------------------------------------------===//
-
 #include <assert.h>
 #include <ctype.h>
-#include <error.h>
-#include <lexer.h>
-#include <parser.h>
-#include <pp.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <utils.h>
+
+// clang-format off
+#include "bcc/error.h"
+#include "bcc/pp.h"
+#include "bcc/lexer.h"
+#include "bcc/utils.h"
+#include "bcc/parser.h"
+// clang-format on 
 
 #define SYM_TABLE_INIT_SIZE 8
 

@@ -1,28 +1,11 @@
-//===------------- lexer.c - Tokenizes a source file lazily --------------===//
-//
-// Part of BCC, which is MIT licensed
-// See https//opensource.org/licenses/MIT
-//
-//===----------------------------- About ---------------------------------===//
-//
-// Breaks a file into tokens lazily.
-//
-//===------------------------------ Todo ---------------------------------===//
-//
-// * Support more complex integer syntaxes (eg. negative signs, hexadecimal,
-//   binary, underscores)
-// * Support floats
-// * Possibly impose naming conventions on tokens
-//
-//===---------------------------------------------------------------------===//
-
 #include <ctype.h>
-#include <error.h>
-#include <lexer.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bcc/error.h"
+#include "bcc/lexer.h"
 
 Lexer newLexer(const unsigned char *buffer, size_t bufferLen) {
     Lexer ret;

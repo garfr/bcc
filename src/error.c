@@ -1,29 +1,11 @@
-//===-------------- error.c - Error formatting and printing ---------------===/
-//
-// Part of BCC, which is MIT licensed
-// See https//opensource.org/licenses/MIT
-//
-//===----------------------------- About ----------------------------------===/
-//
-// This file provides functions to add to a global error list, which will then
-// be printed when the compiler can no longer continue
-//
-//===------------------------------ Todo ----------------------------------===/
-//
-// * Better multiline errors
-// * Give a specific variant in a variant enum to an error
-//   rather than just having the code raising the error dynamically allocate a
-//   string every time.
-//
-//===----------------------------------------------------------------------===/
-
-#include <error.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <utils.h>
+
+#include "bcc/error.h"
+#include "bcc/utils.h"
 
 #define BOLDRED "\033[1m\033[31m"
 #define BOLDWHITE "\033[1m\033[37m"
