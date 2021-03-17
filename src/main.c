@@ -39,11 +39,25 @@
 #include <unistd.h>
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        printf("ERROR: Usage \"bcc (filename) [flags]\".\n");
-        exit(1);
+    opterr = 0;
+
+    int c;
+    char *outputname = NULL;
+
+    bool makeExecutable = true;
+
+    char *filename = argv[1];
+
+    while ((c = getopt(argc - 1, &argv[1], "co:")) != -1) {
+        switch (c) {
+        case 'c':
+            makeExecutable = false;
+            break;
+        case 'o':
+            outputname = optarg;
+            break;
+        }
     }
-    const char *filename = argv[1];
 
     /* mmap the file open */
     int fd = open(filename, O_RDONLY);
@@ -90,6 +104,41 @@ int main(int argc, char *argv[]) {
         printErrors();
     }
 
-    generateCode(ast);
+    if (outputname == NULL) {
+        if (makeExecutable) {
+            outputname = "a.out";
+            FILE *file = fopen(outputname, "w");
+            generateCode(ast, file);
+            fclose(file);
+            system(msprintf("mv %s %s.ssa", outputname, outputname));
+            system(msprintf("./qbe %s.ssa -o %s.s", outputname, outputname));
+            system(msprintf("gcc %s.s -o %s", outputname, outputname));
+            system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+        } else {
+            FILE *file = fopen("temp.temp.temp.ssa", "w");
+            generateCode(ast, file);
+            fclose(file);
+            system("./qbe temp.temp.temp.ssa");
+            system("rm temp.temp.temp.ssa");
+        }
+    } else {
+        if (makeExecutable) {
+            FILE *file = fopen(outputname, "w");
+            generateCode(ast, file);
+            fclose(file);
+            system(msprintf("mv %s %s.ssa", outputname, outputname));
+            system(msprintf("./qbe %s.ssa -o %s.s", outputname, outputname));
+            system(msprintf("gcc %s.s -o %s", outputname, outputname));
+            system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+        } else {
+            FILE *file = fopen(outputname, "w");
+            generateCode(ast, file);
+            fclose(file);
+            system(msprintf("mv %s %s.ssa", outputname, outputname));
+            system(msprintf("./qbe %s.ssa -o %s.s", outputname, outputname));
+            system(msprintf("gcc %s.s -o %s -c", outputname, outputname));
+            system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+        }
+    }
 }
 
