@@ -46,6 +46,10 @@ int main(int argc, char *argv[]) {
 
     bool makeExecutable = true;
 
+    if (argc < 2) {
+        printf("ERROR: Correct format: bcc (filename) [options].\n");
+        exit(1);
+    }
     char *filename = argv[1];
 
     while ((c = getopt(argc - 1, &argv[1], "co:")) != -1) {

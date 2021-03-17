@@ -7,3 +7,4 @@ cp obj/qbe ../qbe-exe
 cd ..
 rm -rf qbe
 mv qbe-exe qbe
+mkdir objs
