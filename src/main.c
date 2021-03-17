@@ -115,15 +115,18 @@ int main(int argc, char *argv[]) {
             generateCode(ast, file);
             fclose(file);
             system(msprintf("mv %s %s.ssa", outputname, outputname));
-            system(msprintf("./qbe %s.ssa -o %s.s", outputname, outputname));
-            system(msprintf("gcc %s.s -o %s", outputname, outputname));
-            system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+            if (system(msprintf("./qbe %s.ssa -o %s.s", outputname,
+                                outputname)) == 0) {
+                system(msprintf("gcc %s.s -o %s", outputname, outputname));
+                system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+            }
         } else {
             FILE *file = fopen("temp.temp.temp.ssa", "w");
             generateCode(ast, file);
             fclose(file);
-            system("./qbe temp.temp.temp.ssa");
-            system("rm temp.temp.temp.ssa");
+            if (system("./qbe temp.temp.temp.ssa") == 0) {
+                system("rm temp.temp.temp.ssa");
+            }
         }
     } else {
         if (makeExecutable) {
@@ -131,17 +134,21 @@ int main(int argc, char *argv[]) {
             generateCode(ast, file);
             fclose(file);
             system(msprintf("mv %s %s.ssa", outputname, outputname));
-            system(msprintf("./qbe %s.ssa -o %s.s", outputname, outputname));
-            system(msprintf("gcc %s.s -o %s", outputname, outputname));
-            system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+            if (system(msprintf("./qbe %s.ssa -o %s.s", outputname,
+                                outputname)) == 0) {
+                system(msprintf("gcc %s.s -o %s", outputname, outputname));
+                system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+            }
         } else {
             FILE *file = fopen(outputname, "w");
             generateCode(ast, file);
             fclose(file);
             system(msprintf("mv %s %s.ssa", outputname, outputname));
-            system(msprintf("./qbe %s.ssa -o %s.s", outputname, outputname));
-            system(msprintf("gcc %s.s -o %s -c", outputname, outputname));
-            system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+            if (system(msprintf("./qbe %s.ssa -o %s.s", outputname,
+                                outputname)) == 0) {
+                system(msprintf("gcc %s.s -o %s -c", outputname, outputname));
+                system(msprintf("rm %s.s %s.ssa", outputname, outputname));
+            }
         }
     }
 }
