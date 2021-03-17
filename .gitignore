@@ -12,3 +12,4 @@ qbe/
 test
 *.ssa
 *.s
+tests/

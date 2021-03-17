@@ -87,6 +87,8 @@ static Token makeSymbolBehind(Lexer *lex) {
         tok.type = TOK_FALSE;
     } else if (compareSymbolStr(sym, "and")) {
         tok.type = TOK_AND;
+    } else if (compareSymbolStr(sym, "extern")) {
+        tok.type = TOK_EXTERN;
     } else if (compareSymbolStr(sym, "or")) {
         tok.type = TOK_OR;
     } else {
@@ -129,6 +131,7 @@ bool newlineNeeded(Lexer *lex) {
     case TOK_RETURN:
     case TOK_FALSE:
     case TOK_TRUE:
+    case TOK_VOID:
         return true;
     default:
         return false;

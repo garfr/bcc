@@ -95,10 +95,18 @@ static int generateExpr(Scope *scope, Expr *expr) {
                 int loc = generateExpr(scope, exp);
                 pushVector(posLoc, &loc);
             }
-            location = getNewNum();
+        }
+        location = getNewNum();
+        if (expr->typeExpr->type != TYP_VOID) {
             printf("\t%%v%d =%s call $%.*s(", location,
                    generateType(expr->typeExpr), (int)expr->funcall.name.len,
                    expr->funcall.name.text);
+        } else {
+            printf("\tcall $%.*s(", (int)expr->funcall.name.len,
+                   expr->funcall.name.text);
+        }
+
+        if (expr->funcall.arguments->numItems > 0) {
             for (size_t i = 0; i < expr->funcall.arguments->numItems - 1; i++) {
                 Expr *exp = *((Expr **)indexVector(expr->funcall.arguments, i));
                 int loc = *((int *)indexVector(posLoc, i));
@@ -108,8 +116,8 @@ static int generateExpr(Scope *scope, Expr *expr) {
             Expr *exp =
                 *((Expr **)indexVector(expr->funcall.arguments,
                                        expr->funcall.arguments->numItems - 1));
-            int loc = *(
-                (int *)indexVector(posLoc, expr->funcall.arguments->numItems));
+            int loc = *((int *)indexVector(
+                posLoc, expr->funcall.arguments->numItems - 1));
             printf("%s %%v%d", generateType(exp->typeExpr), loc);
         }
         printf(")\n");
@@ -157,6 +165,7 @@ static void generateStatement(Scope *scope, Stmt *stmt) {
     }
     }
 }
+
 static void generateFunction(Function *fn) {
     printf("export function %s $%.*s(", generateType(fn->retType),
            (int)fn->name.len, fn->name.text);
@@ -194,6 +203,8 @@ static void generateToplevel(Toplevel top) {
     case TOP_VAR:
         printf("Global variables not implemented yet.\n");
         exit(1);
+    case TOP_EXTERN:
+        break;
     }
 }
 

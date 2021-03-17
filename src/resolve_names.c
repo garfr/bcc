@@ -88,6 +88,7 @@ void resolveNames(AST *ast) {
             }
         }
         case TOP_VAR:
+        case TOP_EXTERN:
             break;
         }
     }

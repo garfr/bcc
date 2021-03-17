@@ -38,13 +38,13 @@ typedef struct Type {
 
     union {
         struct {
-            Vector *args;  // Types*
+            Vector *args; // Types*
             struct Type *retType;
         } fun;
         HashEntry *typeEntry;
         struct {
-            Hashtbl *recordFields;  // RecordField
-            Vector *vec;  // A linear list of HashEntries, that represents the
+            Hashtbl *recordFields; // RecordField
+            Vector *vec; // A linear list of HashEntries, that represents the
         } record;
     };
 } Type;
@@ -85,9 +85,9 @@ typedef struct Expr {
 
         struct {
             HashEntry *entry;
-            Vector *arguments;  // Expr*
-            Symbol name;        // This is kept so function declarations can be
-                                // resolved without forward declarations
+            Vector *arguments; // Expr*
+            Symbol name;       // This is kept so function declarations can be
+                               // resolved without forward declarations
         } funcall;
 
         struct {
@@ -140,9 +140,9 @@ typedef struct {
 
 typedef struct {
     Symbol name;
-    Vector *params;  // Param
+    Vector *params; // Param
     Type *retType;
-    Vector *stmts;  // *Stmt
+    Vector *stmts; // *Stmt
     Scope *scope;
 
     size_t start;
@@ -161,16 +161,21 @@ typedef struct {
     enum {
         TOP_VAR,
         TOP_PROC,
+        TOP_EXTERN,
     } type;
     union {
         Stmt *var;
         Function *fn;
+        struct {
+            HashEntry *entry;
+            Type *type;
+        } external;
     };
 } Toplevel;
 
 /* The full abstract syntax tree that currently is just a vector of
  * statments and a global scope */
 typedef struct {
-    Vector *decs;  // Toplevel
+    Vector *decs; // Toplevel
     Scope *globalScope;
 } AST;

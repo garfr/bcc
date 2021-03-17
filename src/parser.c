@@ -143,7 +143,8 @@ Type *parseType(Parser *parser) {
     Type *ret;
 
     Token tok = nextToken(parser->lex);
-    if (tok.type != TOK_SYM && tok.type != TOK_VOID && tok.type != TOK_BOOL) {
+    if (tok.type != TOK_SYM && tok.type != TOK_VOID && tok.type != TOK_BOOL &&
+        tok.type != TOK_LPAREN) {
         queueError(msprintf("Unexpected token, expected type to be a "
                             "single symbol, arrays "
                             "and pointers are not supported"),
@@ -206,6 +207,30 @@ Type *parseType(Parser *parser) {
         return VoidType;
     case TOK_BOOL:
         return BooleanType;
+    case TOK_LPAREN: {
+        // This is a function type
+        Vector *params = newVector(sizeof(Type *), 0);
+        while (peekToken(parser->lex).type != TOK_RPAREN) {
+            Type *tempType = parseType(parser);
+            pushVector(params, &tempType);
+        }
+
+        nextToken(parser->lex); // Skip past the last parenthesis
+
+        Token arrowTok = nextToken(parser->lex);
+        if (arrowTok.type != TOK_ARROW) {
+            queueError("Expected '->' after function parameters",
+                       arrowTok.start, arrowTok.end);
+            printErrors();
+        }
+
+        Type *retType = parseType(parser);
+        Type *finalType = calloc(1, sizeof(Type));
+        finalType->fun.args = params;
+        finalType->fun.retType = retType;
+        finalType->type = TYP_FUN;
+        return finalType;
+    }
 
     default:
         assert(false);
@@ -398,8 +423,6 @@ Expr *parsePrimary(Parser *parser) {
         return ret;
 
     default:
-        printToken(tok);
-        printToken(nextToken(parser->lex));
         queueError(msprintf("Expected an integer or variable name for "
                             "expressions, not another token"),
                    tok.start, tok.end);
@@ -626,9 +649,10 @@ Stmt *parseAssignment(Parser *parser, Token symTok) {
     Expr *value = parseExpr(parser);
 
     Token semiTok = nextToken(parser->lex);
-    if (semiTok.type != TOK_SEMICOLON) {
-        queueError(msprintf("Expected ';' after expression in assignment"),
-                   semiTok.start, semiTok.end);
+    if (semiTok.type != TOK_SEMICOLON && semiTok.type != TOK_NEWLINE) {
+        queueError(
+            msprintf("Expected ';' or newline after expression in assignment"),
+            semiTok.start, semiTok.end);
         printErrors();
     }
     Stmt *ret = stmtFromTwoPoints(symTok.start, semiTok.end, STMT_ASSIGN);
@@ -708,11 +732,12 @@ Stmt *parseStmt(Parser *parser) {
         default: {
             Expr *expr = parseExpr(parser);
             Token semiTok = nextToken(parser->lex);
-            if (semiTok.type != TOK_SEMICOLON) {
-                queueError("Expected ';' after expression parsed as a "
-                           "standalone "
-                           "statement",
-                           expr->start, semiTok.end);
+            if (semiTok.type != TOK_SEMICOLON && semiTok.type != TOK_NEWLINE) {
+                queueError(
+                    "Expected ';' or newline after expression parsed as a "
+                    "standalone "
+                    "statement",
+                    expr->start, semiTok.end);
                 semiTok = continueUntil(parser->lex, TOK_SEMICOLON_BITS);
             }
 
@@ -887,6 +912,51 @@ void parseTypeDec(Parser *parser) {
     }
 }
 
+Toplevel parseExternal(Parser *parser) {
+
+    Token symTok = nextToken(parser->lex);
+    if (symTok.type != TOK_SYM) {
+        queueError("Expected name of external value in external declaration",
+                   symTok.start, symTok.end);
+        printErrors();
+    }
+
+    Token colonTok = nextToken(parser->lex);
+    if (colonTok.type != TOK_COLON) {
+        queueError("Expected ':' after name of external declaration",
+                   colonTok.start, colonTok.end);
+        printErrors();
+    }
+
+    Type *type = parseType(parser);
+
+    Token endTok = nextToken(parser->lex);
+    if (endTok.type != TOK_NEWLINE && endTok.type != TOK_SEMICOLON) {
+        queueError("Expected ';' or newline after external declaration",
+                   endTok.start, endTok.end);
+    }
+
+    TypedEntry *info = calloc(1, sizeof(TypedEntry));
+    info->isMut = false;
+    info->type = type;
+
+    HashEntry *entry =
+        insertHashtbl(parser->currentScope->vars, symTok.sym, info);
+    if (entry == NULL) {
+
+        queueError(
+            msprintf("Cannot declare variable '%,*s' again in the same scope",
+                     symTok.sym.len, symTok.sym.text),
+            symTok.start, symTok.end);
+        printErrors();
+    }
+
+    Toplevel ret;
+    ret.type = TOP_EXTERN;
+    ret.external.entry = entry;
+    ret.external.type = type;
+    return ret;
+}
 Toplevel parseToplevel(Parser *parser) {
     Token keywordTok = nextToken(parser->lex);
     switch (keywordTok.type) {
@@ -896,9 +966,12 @@ Toplevel parseToplevel(Parser *parser) {
     case TOK_TYPE:
         parseTypeDec(parser);
         return parseToplevel(parser);
+    case TOK_EXTERN:
+        return parseExternal(parser);
     default:
-        printToken(keywordTok);
-        printf("Internal compiler error: No global vars yet. 1\n");
+        queueError("Unexpected token. NOTE: There are no global vars yet",
+                   keywordTok.start, keywordTok.end);
+        printErrors();
         exit(1);
     }
 }

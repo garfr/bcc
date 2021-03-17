@@ -26,6 +26,9 @@ void printToken(Token tok) {
     case TOK_RETURN:
         printf("TOK_RETURN");
         break;
+    case TOK_EXTERN:
+        printf("TOK_EXTERN");
+        break;
     case TOK_PROC:
         printf("TOK_PROC");
         break;
@@ -297,6 +300,12 @@ void printToplevel(Toplevel top) {
     case TOP_VAR:
         printf("Internal compiler error: Not global variables yet.\n");
         exit(1);
+    case TOP_EXTERN:
+        printf("External: '%.*s' : ", (int)top.external.entry->id.len,
+               top.external.entry->id.text);
+        printType(top.external.type);
+        printf("\n");
+        break;
     case TOP_PROC:
         printf("%.*s (", (int)top.fn->name.len, top.fn->name.text);
         printParams(top.fn->params);
