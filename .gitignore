@@ -13,3 +13,4 @@ test
 *.ssa
 *.s
 tests/
+!include/bcc
