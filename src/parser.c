@@ -251,6 +251,9 @@ Type *parseComplexType(Parser *parser) {
             if (commaToken.type == TOK_COMMA) {
                 nextToken(parser->lex);
             }
+            if (peekToken(parser->lex).type == TOK_NEWLINE) {
+                nextToken(parser->lex);
+            }
             HashEntry *entry =
                 insertHashtbl(recordFields, symTok.sym, fieldType);
 

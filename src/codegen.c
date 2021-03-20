@@ -180,7 +180,7 @@ char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy, FILE *file) {
         return msprintf("%%%d", location);
     }
     case EXP_RECORDLIT:
-        fprintf(file, "No funcalls or record lits yet.\n");
+        printf("No funcalls or record lits yet.\n");
         exit(1);
     }
     return 0;
