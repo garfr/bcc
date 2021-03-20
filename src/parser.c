@@ -300,9 +300,10 @@ Expr *parseFuncall(Parser *parser, Token symTok) {
     funcall->funcall.arguments = args;
     funcall->start = symTok.start;
     funcall->funcall.name = symTok.sym;
+
     if (entry != NULL) {
         funcall->funcall.entry = entry;
-        funcall->typeExpr = ((TypedEntry *)entry->data)->type->fun.retType;
+        funcall->typeExpr = ((TypedEntry*)entry->data)->type;
     }
 
     funcall->end = endTok.end;
@@ -854,12 +855,6 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
     functionType->fun.args = paramTypes;
     functionType->fun.retType = retType;
 
-    TypedEntry *funEntry = calloc(1, sizeof(TypedEntry));
-    funEntry->isMut = false;
-    funEntry->type = functionType;
-
-    insertHashtbl(parser->currentScope->upScope->vars, symTok.sym, funEntry);
-
     Vector *stmts = newVector(sizeof(Stmt *), 0);
 
     Token endTok;
@@ -882,6 +877,12 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
     fun->start = keywordTok.start;
     fun->end = endTok.end;
 
+    TypedEntry *funEntry = calloc(1, sizeof(TypedEntry));
+    funEntry->isMut = false;
+    funEntry->type = functionType;
+    funEntry->fun = fun;
+
+    insertHashtbl(parser->currentScope->upScope->vars, symTok.sym, funEntry);
     return fun;
 }
 

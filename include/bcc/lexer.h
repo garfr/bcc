@@ -20,6 +20,9 @@ enum TokenType {
     TOK_AND,
     TOK_OR,
     TOK_EXTERN,
+    TOK_IF,
+    TOK_ELSE,
+    TOK_THEN,
 
     /* Symbols, and other values */
     TOK_SYM,

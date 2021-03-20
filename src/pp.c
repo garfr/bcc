@@ -29,6 +29,15 @@ void printToken(Token tok) {
     case TOK_OR:
         printf("TOK_OR");
         break;
+    case TOK_IF:
+        printf("TOK_IF`");
+        break;
+    case TOK_THEN:
+        printf("TOK_THEN");
+        break;
+    case TOK_ELSE:
+        printf("TOK_ELSE");
+        break;
     case TOK_FALSE:
         printf("TOK_FALSE");
         break;

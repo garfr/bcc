@@ -19,6 +19,7 @@ const char *generateType(Type *type) {
         return "l";
     case TYP_S64:
     case TYP_U64:
+    case TYP_FUN:
 
         return "w";
     case TYP_VOID:
@@ -158,7 +159,12 @@ char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy, FILE *file) {
         return msprintf("%.*s", (int)expr->intlit.len, expr->intlit.text);
     case EXP_VAR:
         *needsCopy = true;
-        return msprintf("%%%.*s", (int)expr->var->id.len, expr->var->id.text);
+        if (expr->typeExpr->type == TYP_FUN) {
+            return msprintf("$%.*s", (int)expr->var->id.len, expr->var->id.text);
+        }
+        else {
+            return msprintf("%%%.*s", (int)expr->var->id.len, expr->var->id.text);
+        }
     case EXP_BOOL:
         *needsCopy = true;
         return msprintf("%d", expr->boolean ? 1 : 0);

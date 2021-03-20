@@ -41,6 +41,9 @@ typedef struct Type {
     };
 } Type;
 
+struct Function;
+typedef struct Function Function;
+
 /* A variant enum representing an expression in the AST */
 typedef struct Expr {
     size_t start;
@@ -78,10 +81,10 @@ typedef struct Expr {
         } binop;
 
         struct {
-            HashEntry *entry;
             Vector *arguments; // Expr*
             Symbol name;       // This is kept so function declarations can be
                                // resolved without forward declarations
+            HashEntry *entry;
         } funcall;
 
         struct {
@@ -132,7 +135,7 @@ typedef struct {
     Type *type;
 } Param;
 
-typedef struct {
+struct Function {
     Symbol name;
     Vector *params; // Param
     Type *retType;
@@ -141,7 +144,7 @@ typedef struct {
 
     size_t start;
     size_t end;
-} Function;
+};
 
 /* The value that the AST symbol table hashes too
  * This will grow as more information is collected */
@@ -149,6 +152,7 @@ typedef struct {
     Type *type;
     int64_t stackOffset;
     bool isMut;
+    Function *fun; // Function pointers
 } TypedEntry;
 
 typedef struct {

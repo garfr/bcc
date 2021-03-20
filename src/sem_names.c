@@ -21,8 +21,8 @@ void resolveExpr(Scope *scope, Expr *exp) {
                 printErrors();
             }
 
-            exp->funcall.entry = entry;
             exp->typeExpr = ((TypedEntry *)entry->data)->type->fun.retType;
+            exp->funcall.entry = entry;
         }
         for (size_t i = 0; i < exp->funcall.arguments->numItems; i++) {
             resolveExpr(scope,
