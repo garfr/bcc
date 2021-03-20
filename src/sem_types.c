@@ -13,6 +13,7 @@
  * point to this */
 static Type *IntegerLit = &(Type){.type = TYP_INTLIT, {}};
 static Type *BooleanLit = &(Type){.type = TYP_BOOL, {}};
+static Type *CharLit = &(Type){.type = TYP_CHAR, {}};
 
 // clang-format off
 
@@ -38,6 +39,8 @@ char *stringOfType(Type *type) {
         return "u16";
     case TYP_U32:
         return "u32";
+    case TYP_CHAR:
+        return "char";
     case TYP_U64:
         return "u64";
     case TYP_VOID:
@@ -257,6 +260,9 @@ void typeExpression(Scope *scope, Expr *exp) {
     case EXP_INT:
         exp->typeExpr = IntegerLit;
         break;
+    case EXP_CHAR:
+        exp->typeExpr = CharLit;
+        break;
     case EXP_BOOL:
         exp->typeExpr = BooleanLit;
         break;
@@ -335,6 +341,7 @@ int64_t calculateSize(Type *type) {
     switch (type->type) {
     case TYP_S8:
     case TYP_U8:
+    case TYP_CHAR:
         return 1;
     case TYP_S16:
     case TYP_U16:

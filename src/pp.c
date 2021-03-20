@@ -56,6 +56,12 @@ void printToken(Token tok) {
     case TOK_INT:
         printf("TOK_INT: '%.*s'", (int)tok.intnum.len, tok.intnum.text);
         break;
+    case TOK_CHARLIT:
+        printf("TOK_CHAR: '%.*s'", (int)tok.character.len, tok.character.text);
+        break;
+    case TOK_CHAR:
+        printf("TOK_CHAR");
+        break;
     case TOK_COLON:
         printf("TOK_COLON");
         break;
@@ -137,6 +143,9 @@ void printType(Type *type) {
     case TYP_U16:
         printf("u16");
         break;
+    case TYP_CHAR:
+        printf("char");
+        break;
     case TYP_U32:
         printf("u32");
         break;
@@ -195,6 +204,10 @@ void printExpr(Expr *exp) {
     switch (exp->type) {
     case EXP_INT:
         printf("EXP_INT: '%.*s' : ", (int)exp->intlit.len, exp->intlit.text);
+        break;
+    case EXP_CHAR:
+        printf("EXP_CHAR: '%.*s' : ", (int)exp->character.len,
+               exp->character.text);
         break;
     case EXP_VAR:
         printf("EXP_VAR: '%.*s'", (int)exp->var->id.len, exp->var->id.text);

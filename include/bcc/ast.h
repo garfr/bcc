@@ -18,6 +18,7 @@ typedef struct Type {
         TYP_U16,
         TYP_U32,
         TYP_U64,
+        TYP_CHAR,
         TYP_RECORD,
         TYP_VOID,
         TYP_INTLIT,
@@ -46,6 +47,7 @@ typedef struct Expr {
     size_t end;
 
     enum ExprType {
+        EXP_CHAR,
         EXP_INT,
         EXP_VAR,
         EXP_BINOP,
@@ -58,6 +60,7 @@ typedef struct Expr {
     union {
         HashEntry *var;
         Symbol intlit;
+        Symbol character;
 
         bool boolean;
         struct {

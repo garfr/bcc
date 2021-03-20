@@ -24,6 +24,8 @@ enum TokenType {
     /* Symbols, and other values */
     TOK_SYM,
     TOK_INT,
+    TOK_CHAR,
+    TOK_CHARLIT,
 
     /* Punctuation */
     TOK_COLON,
@@ -59,6 +61,7 @@ typedef struct {
         /* Integers are kept symbols until they can be proven to fit into a
          * certain integer type */
         Symbol intnum;
+        Symbol character;
     };
 
 } Token;
@@ -69,6 +72,7 @@ enum LexerState {
     LEX_INT,
     LEX_DASH,
     LEX_COLON,
+    LEX_SINGLE_QUOTE,
     LEX_EQUAL
 };
 

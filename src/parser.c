@@ -23,6 +23,7 @@ typedef struct {
 
 static Type *VoidType = &(Type){.type = TYP_VOID, {}};
 static Type *BooleanType = &(Type){.type = TYP_BOOL, {}};
+static Type *CharType = &(Type){.type = TYP_CHAR, {}};
 
 /* Bit flags used by continueUntil to allow continuing until one of several
  * tokens is reached */
@@ -128,7 +129,7 @@ Type *parseType(Parser *parser) {
 
     Token tok = nextToken(parser->lex);
     if (tok.type != TOK_SYM && tok.type != TOK_VOID && tok.type != TOK_BOOL &&
-        tok.type != TOK_LPAREN) {
+        tok.type != TOK_LPAREN && tok.type != TOK_CHAR) {
         queueError(msprintf("Unexpected token, expected type to be a "
                             "single symbol, arrays "
                             "and pointers are not supported"),
@@ -189,6 +190,8 @@ Type *parseType(Parser *parser) {
         break;
     case TOK_VOID:
         return VoidType;
+    case TOK_CHAR:
+        return CharType;
     case TOK_BOOL:
         return BooleanType;
     case TOK_LPAREN: {
@@ -371,6 +374,11 @@ Expr *parsePrimary(Parser *parser) {
         ret->intlit = tok.intnum;
         ret->typeExpr = NULL;
         return ret;
+    case TOK_CHARLIT:
+        ret = exprFromToken(tok, EXP_CHAR);
+        ret->character = tok.character;
+        ret->typeExpr = NULL;
+        return ret;
     case TOK_SYM:
 
         switch (peekToken(parser->lex).type) {
@@ -380,6 +388,7 @@ Expr *parsePrimary(Parser *parser) {
         case TOK_LBRACKET:
             nextToken(parser->lex);
             return parseRecordLit(parser, tok);
+
 
         default:
             ret = exprFromToken(tok, EXP_VAR);
@@ -410,6 +419,7 @@ Expr *parsePrimary(Parser *parser) {
         return ret;
 
     default:
+        printToken(tok);
         queueError(msprintf("Expected an integer or variable name for "
                             "expressions, not another token"),
                    tok.start, tok.end);

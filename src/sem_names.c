@@ -36,6 +36,7 @@ void resolveExpr(Scope *scope, Expr *exp) {
     case EXP_INT:
     case EXP_BOOL:
     case EXP_VAR:
+    case EXP_CHAR:
         return;
     case EXP_RECORDLIT: {
         for (size_t i = 0; i < exp->reclit.fields->entries; i++) {

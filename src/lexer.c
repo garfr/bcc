@@ -44,6 +44,7 @@ static Token makeSymbolBehind(Lexer *lex) {
     Token tok;
     tok.start = lex->startIdx;
     tok.end = lex->endIdx - 1;
+    // TODO: Make this a table
     /* Check if it matches any keywords, this can be replaced with a table in
      * the future */
     if (compareSymbolStr(sym, "let")) {
@@ -60,6 +61,8 @@ static Token makeSymbolBehind(Lexer *lex) {
         tok.type = TOK_VOID;
     } else if (compareSymbolStr(sym, "return")) {
         tok.type = TOK_RETURN;
+    } else if (compareSymbolStr(sym, "char")) {
+        tok.type = TOK_CHAR;
     } else if (compareSymbolStr(sym, "type")) {
         tok.type = TOK_TYPE;
     } else if (compareSymbolStr(sym, "record")) {
@@ -105,6 +108,24 @@ static Token makeIntBehind(Lexer *lex) {
     return tok;
 }
 
+static Token makeCharBehind(Lexer *lex) {
+    Symbol sym = (Symbol){.text = &lex->buffer[lex->startIdx],
+                          .len = lex->endIdx - lex->startIdx};
+
+    lex->endIdx++;
+    Token tok = (Token){.start = lex->startIdx,
+                        .end = lex->endIdx,
+                        .type = TOK_CHARLIT,
+                        .character = sym};
+
+    if (lex->startIdx == lex->endIdx) {
+        tok.end = lex->endIdx;
+    }
+    lex->startIdx = lex->endIdx;
+    lex->state = LEX_START;
+    return tok;
+}
+
 bool newlineNeeded(Lexer *lex) {
     switch (lex->previousTok.type) {
     case TOK_INT:
@@ -115,6 +136,8 @@ bool newlineNeeded(Lexer *lex) {
     case TOK_FALSE:
     case TOK_TRUE:
     case TOK_VOID:
+    case TOK_CHARLIT:
+    case TOK_CHAR:
         return true;
     default:
         return false;
@@ -164,6 +187,11 @@ Token getToken(Lexer *lex) {
             case '-':
                 lex->endIdx++;
                 lex->state = LEX_DASH;
+                continue;
+            case '\'':
+                lex->endIdx++;
+                lex->startIdx = lex->endIdx;
+                lex->state = LEX_SINGLE_QUOTE;
                 continue;
             case ':':
                 lex->endIdx++;
@@ -260,6 +288,17 @@ Token getToken(Lexer *lex) {
                 continue;
             } else {
                 return makeIntBehind(lex);
+            }
+        }
+        case LEX_SINGLE_QUOTE: {
+            if (lex->endIdx >= lex->bufferLen) {
+                return makeCharBehind(lex);
+            }
+            unsigned char c = lex->buffer[lex->endIdx];
+            if (c == '\'') {
+                return makeCharBehind(lex);
+            } else {
+                lex->endIdx++;
             }
         }
         }
