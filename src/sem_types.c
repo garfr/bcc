@@ -405,6 +405,41 @@ void typeStmt(Scope *scope, Stmt *stmt, int64_t *stackSpace) {
                        stmt->start, stmt->end);
         }
         break;
+
+    case STMT_IF: {
+
+        typeExpression(scope, stmt->if_block.cond);
+
+        if (stmt->if_block.cond->typeExpr->type != TYP_BOOL) {
+            queueError("Expression in 'if' statements must be a boolean",
+                       stmt->if_block.cond->start, stmt->if_block.cond->end);
+        }
+
+        for (size_t i = 0; i < stmt->if_block.block->numItems; i++) {
+            Stmt *tempStmt = *((Stmt **)indexVector(stmt->if_block.block, i));
+            typeStmt(scope, tempStmt, stackSpace);
+        }
+        break;
+    }
+    case STMT_IF_ELSE: {
+        typeExpression(scope, stmt->if_else.cond);
+
+        if (stmt->if_else.cond->typeExpr->type != TYP_BOOL) {
+            queueError("Expression in 'if' statements must be a boolean",
+                       stmt->if_else.cond->start, stmt->if_else.cond->end);
+            printErrors();
+        }
+
+        for (size_t i = 0; i < stmt->if_else.block1->numItems; i++) {
+            Stmt *tempStmt = *((Stmt **)indexVector(stmt->if_else.block1, i));
+            typeStmt(scope, tempStmt, stackSpace);
+        }
+        for (size_t i = 0; i < stmt->if_else.block2->numItems; i++) {
+            Stmt *tempStmt = *((Stmt **)indexVector(stmt->if_else.block2, i));
+            typeStmt(scope, tempStmt, stackSpace);
+        }
+        break;
+    }
     case STMT_DEC_ASSIGN: {
         typeExpression(scope, stmt->dec_assign.value);
 

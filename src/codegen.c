@@ -37,7 +37,7 @@ int getNewNum() {
     return cnt++;
 }
 
-char *generateBinaryOp(int op) {
+char *generateBinaryOp(int op, Type *type) {
 
     switch (op) {
 
@@ -49,10 +49,33 @@ char *generateBinaryOp(int op) {
         return "mul";
     case BINOP_DIV:
         return "div";
+    case BINOP_EQUAL:
+        switch (type->type) {
+        case TYP_S8:
+        case TYP_U8:
+        case TYP_S16:
+        case TYP_U16:
+        case TYP_S32:
+        case TYP_U32:
+        case TYP_BOOL:
+        case TYP_INTLIT:
+        case TYP_CHAR:
+        case TYP_VOID:
+            return "ceql";
+        case TYP_S64:
+        case TYP_U64:
+        case TYP_FUN:
+        case TYP_RECORD:
+            return "ceqw";
+        case TYP_BINDING:
+            return generateBinaryOp(op, type->typeEntry->data);
+        }
+        break;
     default:
         printf("Invalid binary operation.\n");
         exit(1);
     }
+    return NULL;
 }
 
 bool needsOwnInstruction(Expr *exp) {
@@ -210,7 +233,7 @@ char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy, FILE *file) {
             expr2 = tempExpr2;
         }
         *needsCopy = false;
-        return msprintf("%s %s, %s\n", generateBinaryOp(expr->binop.op), expr1,
+        return msprintf("%s %s, %s\n", generateBinaryOp(expr->binop.op, expr->typeExpr), expr1,
                         expr2);
     }
 
@@ -243,6 +266,7 @@ char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy, FILE *file) {
         }
 
         int location = getNewNum();
+
         if (expr->typeExpr->type != TYP_VOID) {
             fprintf(file, "\t%%v%d =%s call $%.*s(", location,
                     generateType(expr->typeExpr), (int)expr->funcall.name.len,
@@ -309,6 +333,27 @@ static void generateStatement(Scope *scope, Stmt *stmt, FILE *file) {
         }
         break;
     }
+    case STMT_IF: {
+        char* expr = generateExpr(scope, stmt->if_block.cond, &copy, file);
+        int value1 = getNewNum();
+        if (copy) {
+
+            fprintf(file, "\t%%v%d =%s copy %s\n", value1, generateType(stmt->if_block.cond->typeExpr), expr);
+        }
+        else {
+            fprintf(file, "\t%%v%d =%s %s\n", value1, generateType(stmt->if_block.cond->typeExpr), expr);
+        }
+        int loc1 = getNewNum();
+        int loc2 = getNewNum();
+        fprintf(file, "\tjnz %%v%d, @loc%d, @loc%d\n@loc%d\n", value1, loc1, loc2, loc1);
+
+        for (size_t i = 0; i < stmt->if_block.block->numItems; i++) {
+            Stmt* tempStmt = *((Stmt**)indexVector(stmt->if_block.block, i));
+            generateStatement(scope, tempStmt, file);
+        }
+        fprintf(file, "@loc%d\n", loc2);
+        break;
+    }
     case STMT_DEC_ASSIGN: {
         char *expr = generateExpr(scope, stmt->dec_assign.value, &copy, file);
         if (copy) {
@@ -324,6 +369,9 @@ static void generateStatement(Scope *scope, Stmt *stmt, FILE *file) {
         }
         break;
     }
+    case STMT_IF_ELSE:
+                          printf("Sorry, cant codegen flow control yet.\n");
+                          exit(1);
     }
 }
 

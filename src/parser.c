@@ -38,6 +38,7 @@ enum TokTypeBits {
     TOK_LPAREN_BITS = 1 << 7,
     TOK_RETURN_BITS = 1 << 8,
     TOK_PERIOD_BITS = 1 << 9,
+    TOK_THEN_BITS = 1 << 10,
 };
 
 /* Runs through tokens until a token passed in bitflags is reached, which is
@@ -746,6 +747,52 @@ Stmt *parseStmt(Parser *parser) {
         }
         }
     }
+    case TOK_IF: {
+        nextToken(parser->lex);
+        Expr* cond = parseExpr(parser);
+
+        Token thenTok = nextToken(parser->lex);
+        if (thenTok.type != TOK_THEN) {
+
+            queueError("Expected keyword 'then' after expression", thenTok.start, thenTok.end);
+            thenTok = continueUntil(parser->lex, TOK_THEN_BITS);
+        }
+
+
+
+        Vector * block1 = newVector(sizeof(Stmt*), 0);
+        while (peekToken(parser->lex).type != TOK_END && peekToken(parser->lex).type != TOK_ELSE) {
+            Stmt * tempStmt = parseStmt(parser);
+            pushVector(block1, &tempStmt);
+        }
+
+        Token elseEndTok = nextToken(parser->lex);
+        if (elseEndTok.type == TOK_END) {
+            Stmt* ret = calloc(1, sizeof(Stmt));
+            ret->type = STMT_IF;
+            ret->if_block.block = block1;
+            ret->if_block.cond = cond ;
+            return ret;
+        }
+        if (elseEndTok.type == TOK_ELSE) {
+            Vector* block2 = newVector(sizeof(Stmt*), 0);
+
+            while (peekToken(parser->lex).type != TOK_END) {
+                Stmt * tempStmt = parseStmt(parser);
+                pushVector(block2, &tempStmt);
+            }
+            nextToken(parser->lex);
+
+            Stmt* ret = calloc(1, sizeof(Stmt));
+            ret->type = STMT_IF_ELSE;
+            ret->if_else.block1 = block1;
+            ret->if_else.block2 = block2;
+            ret->if_else.cond = cond;
+            return ret;
+        }
+        return NULL;
+    }
+                   
     default: {
         Expr *expr = parseExpr(parser);
 

@@ -287,6 +287,34 @@ void printStmt(Stmt *stmt) {
         printExpr(stmt->assign.value);
         printf(")");
         break;
+    case STMT_IF: {
+        printf("STMT_IF: ");
+        printExpr(stmt->if_block.cond);
+        printf("\n");
+        for (size_t i = 0; i < stmt->if_block.block->numItems; i++) {
+            Stmt *tempStmt = *((Stmt **)indexVector(stmt->if_block.block, i));
+            printStmt(tempStmt);
+            printf("\n");
+        }
+        break;
+    }
+    case STMT_IF_ELSE: {
+        printf("STMT_IF_ELSE: ");
+        printExpr(stmt->if_else.cond);
+        printf("\n");
+        for (size_t i = 0; i < stmt->if_else.block1->numItems; i++) {
+            Stmt *tempStmt = *((Stmt **)indexVector(stmt->if_else.block1, i));
+            printStmt(tempStmt);
+            printf("\n");
+        }
+        printf("ELSE");
+        for (size_t i = 0; i < stmt->if_else.block2->numItems; i++) {
+            Stmt *tempStmt = *((Stmt **)indexVector(stmt->if_else.block2, i));
+            printStmt(tempStmt);
+            printf("\n");
+        }
+        break;
+    }
     }
 
     printf(" %zd-%zd", stmt->start, stmt->end);

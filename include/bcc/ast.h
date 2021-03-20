@@ -104,13 +104,27 @@ typedef struct Stmt {
         STMT_DEC_ASSIGN,
         STMT_ASSIGN,
         STMT_RETURN,
-        STMT_EXPR
+        STMT_EXPR,
+        STMT_IF,
+        STMT_IF_ELSE,
+
     } type;
 
     union {
         struct {
             HashEntry *var;
         } dec;
+
+        struct {
+            Vector *block; // Stmt*
+            Expr *cond;
+        } if_block;
+
+        struct {
+            Vector *block1; // Stmt*
+            Vector *block2; // Stmt*
+            Expr *cond;
+        } if_else;
 
         struct {
             HashEntry *var;

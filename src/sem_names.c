@@ -49,14 +49,7 @@ void resolveExpr(Scope *scope, Expr *exp) {
     }
 }
 
-void resolveNames(AST *ast) {
-    for (size_t i = 0; i < ast->decs->numItems; i++) {
-        Toplevel toplevel = *((Toplevel *)indexVector(ast->decs, i));
-        switch (toplevel.type) {
-        case TOP_PROC: {
-            Scope *scope = toplevel.fn->scope;
-            for (size_t j = 0; j < toplevel.fn->stmts->numItems; j++) {
-                Stmt *stmt = *((Stmt **)indexVector(toplevel.fn->stmts, j));
+void resolveStmt(Scope* scope, Stmt* stmt) {
                 switch (stmt->type) {
                 case STMT_EXPR:
                     resolveExpr(scope, stmt->singleExpr);
@@ -66,6 +59,28 @@ void resolveNames(AST *ast) {
                 case STMT_ASSIGN:
                     resolveExpr(scope, stmt->assign.value);
                     break;
+                case STMT_IF: {
+
+                    resolveExpr(scope, stmt->if_block.cond);
+                    for (size_t i = 0; i < stmt->if_block.block->numItems; i++) {
+                        Stmt* tempStmt = *((Stmt**)indexVector(stmt->if_block.block, i));
+                        resolveStmt(scope, tempStmt);
+                    }
+                    break;
+                }
+                case STMT_IF_ELSE: {
+
+                    resolveExpr(scope, stmt->if_else.cond);
+                    for (size_t i = 0; i < stmt->if_else.block1->numItems; i++) {
+                        Stmt* tempStmt = *((Stmt**)indexVector(stmt->if_else.block1, i));
+                        resolveStmt(scope, tempStmt);
+                    }
+                    for (size_t i = 0; i < stmt->if_else.block2->numItems; i++) {
+                        Stmt* tempStmt = *((Stmt**)indexVector(stmt->if_else.block2, i));
+                        resolveStmt(scope, tempStmt);
+                    }
+                    break;
+                }
                 case STMT_RETURN:
                     if (stmt->returnExp != NULL) {
                         resolveExpr(scope, stmt->returnExp);
@@ -75,6 +90,17 @@ void resolveNames(AST *ast) {
                     resolveExpr(scope, stmt->dec_assign.value);
                     break;
                 }
+
+}
+void resolveNames(AST *ast) {
+    for (size_t i = 0; i < ast->decs->numItems; i++) {
+        Toplevel toplevel = *((Toplevel *)indexVector(ast->decs, i));
+        switch (toplevel.type) {
+        case TOP_PROC: {
+            Scope *scope = toplevel.fn->scope;
+            for (size_t j = 0; j < toplevel.fn->stmts->numItems; j++) {
+                Stmt *stmt = *((Stmt **)indexVector(toplevel.fn->stmts, j));
+                resolveStmt(scope, stmt);
             }
         }
         case TOP_VAR:
