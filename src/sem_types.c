@@ -373,9 +373,8 @@ int64_t calculateSize(Type *type) {
 }
 
 /* Adds type information to a statment, including inserting any needed
- * information into the symbol table
- * Returns whether the stmt was a properly typed return statment */
-bool typeStmt(Scope *scope, Stmt *stmt, Type *returnType, int64_t *stackSpace) {
+ * information into the symbol table */
+void typeStmt(Scope *scope, Stmt *stmt, int64_t *stackSpace) {
     assert(scope != NULL);
     assert(stmt != NULL);
 
@@ -435,32 +434,6 @@ bool typeStmt(Scope *scope, Stmt *stmt, Type *returnType, int64_t *stackSpace) {
     case STMT_RETURN: {
         if (stmt->returnExp != NULL) {
             typeExpression(scope, stmt->returnExp);
-            /* If the user wants to return a function call that has type
-             * void */
-            if (stmt->returnExp->typeExpr->type == TYP_VOID &&
-                returnType->type == TYP_VOID) {
-                return true;
-            }
-            if (coerceAssignment(returnType, stmt->returnExp->typeExpr) ==
-                NULL) {
-                queueError(msprintf("Cannot return type %s in a function "
-                                    "that returns %s",
-                                    stringOfType(stmt->returnExp->typeExpr),
-                                    stringOfType(returnType)),
-                           stmt->start, stmt->end);
-                return false;
-            }
-            return true;
-        } else {
-            if (returnType->type == TYP_VOID) {
-                return true;
-            } else {
-                queueError("Cannot return actual value in a function that "
-                           "returns "
-                           "void",
-                           stmt->start, stmt->end);
-                return false;
-            }
         }
     } break;
     case STMT_ASSIGN: {
@@ -475,7 +448,7 @@ bool typeStmt(Scope *scope, Stmt *stmt, Type *returnType, int64_t *stackSpace) {
                                 stmt->assign.var->id.len,
                                 stmt->assign.var->id.text),
                        stmt->start, stmt->end);
-            return false;
+            return;
         }
 
         Type *type =
@@ -491,7 +464,6 @@ bool typeStmt(Scope *scope, Stmt *stmt, Type *returnType, int64_t *stackSpace) {
         break;
     }
     }
-    return false;
 }
 
 void typeToplevel(Toplevel *top) {
@@ -503,17 +475,10 @@ void typeToplevel(Toplevel *top) {
     case TOP_EXTERN:
         break;
     case TOP_PROC: {
-        bool returnsCorrectly = false;
         int64_t stackSize = 0;
         for (size_t i = 0; i < top->fn->stmts->numItems; i++) {
-            returnsCorrectly = typeStmt(
-                top->fn->scope, *((Stmt **)indexVector(top->fn->stmts, i)),
-                top->fn->retType, &stackSize);
-        }
-
-        if (!returnsCorrectly && top->fn->retType->type != TYP_VOID) {
-            queueError("Function never returns a correct type", top->fn->start,
-                       top->fn->start);
+            typeStmt(top->fn->scope, *((Stmt **)indexVector(top->fn->stmts, i)),
+                     &stackSize);
         }
     }
     }

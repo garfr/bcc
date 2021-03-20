@@ -14,10 +14,10 @@ const char *generateType(Type *type) {
     case TYP_S32:
     case TYP_U32:
     case TYP_BOOL:
+    case TYP_INTLIT:
         return "l";
     case TYP_S64:
     case TYP_U64:
-    case TYP_INTLIT:
 
         return "w";
     case TYP_VOID:
@@ -53,50 +53,106 @@ char *generateBinaryOp(int op) {
     }
 }
 
-static int generateExpr(Scope *scope, Expr *expr, FILE *file) {
-    int location;
+bool needsOwnInstruction(Expr *exp) {
+
+    switch (exp->type) {
+    case EXP_INT:
+    case EXP_VAR:
+    case EXP_BOOL:
+        return false;
+    case EXP_BINOP:
+    case EXP_FUNCALL:
+    case EXP_RECORDLIT:
+        return true;
+    default:
+        printf("ERROR: Unexpected exp enum: %d\n", exp->type);
+        exit(1);
+    }
+}
+
+char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy, FILE *file) {
     switch (expr->type) {
     case EXP_INT:
-        location = getNewNum();
-        fprintf(file, "\t%%v%d =l copy %.*s\n", location, (int)expr->intlit.len,
-                expr->intlit.text);
-        return location;
+        *needsCopy = true;
+        return msprintf("%.*s", (int)expr->intlit.len, expr->intlit.text);
     case EXP_VAR:
-        location = getNewNum();
-        fprintf(file, "\t%%v%d =%s copy %%%.*s\n", location,
-                generateType(expr->typeExpr), (int)expr->var->id.len,
-                expr->var->id.text);
-        return location;
+        *needsCopy = true;
+        return msprintf("%%%.*s", (int)expr->var->id.len, expr->var->id.text);
     case EXP_BOOL:
-        location = getNewNum();
-        if (expr->boolean) {
-            fprintf(file, "\t%%v%d =l copy 1\n", location);
-        } else {
-            fprintf(file, "\t%%v%d =l copy 0\n", location);
-        }
-        return location;
+        *needsCopy = true;
+        return msprintf("%d", expr->boolean ? 1 : 0);
     case EXP_BINOP: {
-        int loc1 = generateExpr(scope, expr->binop.exp1, file);
-        int loc2 = generateExpr(scope, expr->binop.exp2, file);
-        int location = getNewNum();
-        fprintf(file, "\t%%v%d =%s %s %%v%d, %%v%d\n", location,
-                generateType(expr->typeExpr), generateBinaryOp(expr->binop.op),
-                loc1, loc2);
-        return location;
+        int loc1 = getNewNum();
+        int loc2 = getNewNum();
+
+        char *tempExpr1 =
+            generateExpr(scope, expr->binop.exp1, needsCopy, file);
+        char *expr1;
+        if (needsOwnInstruction(expr->binop.exp1)) {
+            if (*needsCopy) {
+                fprintf(file, "\t%%v%d =%s %s\n", loc1,
+                        generateType(expr->typeExpr), tempExpr1);
+
+            } else {
+                fprintf(file, "\t%%v%d =%s copy %s\n", loc1,
+                        generateType(expr->typeExpr), tempExpr1);
+            }
+            expr1 = msprintf("%%v%d", loc1);
+        } else {
+            expr1 = tempExpr1;
+        }
+
+        char *tempExpr2 =
+            generateExpr(scope, expr->binop.exp2, needsCopy, file);
+        char *expr2;
+
+        if (needsOwnInstruction(expr->binop.exp2)) {
+            if (*needsCopy) {
+                fprintf(file, "\t%%v%d =%s %s\n", loc2,
+                        generateType(expr->typeExpr), tempExpr2);
+            } else {
+                fprintf(file, "\t%%v%d =%s copy %s\n", loc2,
+                        generateType(expr->typeExpr), tempExpr2);
+            }
+            expr2 = msprintf("%%v%d", loc1);
+        } else {
+
+            expr2 = tempExpr2;
+        }
+        *needsCopy = false;
+        return msprintf("%s %s, %s\n", generateBinaryOp(expr->binop.op), expr1,
+                        expr2);
     }
 
     case EXP_FUNCALL: {
 
-        Vector *posLoc =
-            newVector(sizeof(int), expr->funcall.arguments->numItems);
+        Vector *exprVec =
+            newVector(sizeof(char *), expr->funcall.arguments->numItems);
         if (expr->funcall.arguments->numItems > 0) {
             for (size_t i = 0; i < expr->funcall.arguments->numItems; i++) {
                 Expr *exp = *((Expr **)indexVector(expr->funcall.arguments, i));
-                int loc = generateExpr(scope, exp, file);
-                pushVector(posLoc, &loc);
+                char *tempExpr;
+                if (needsOwnInstruction(exp)) {
+                    int tempLoc = getNewNum();
+                    char *tempTempExpr =
+                        generateExpr(scope, exp, needsCopy, file);
+                    if (*needsCopy) {
+                        fprintf(file, "\t%%v%d =%s copy %s\n", tempLoc,
+                                generateType(exp->typeExpr), tempTempExpr);
+                        tempExpr = msprintf("%%v%d", tempLoc);
+                    } else {
+                        fprintf(file, "\t%%v%d =%s %s\n", tempLoc,
+                                generateType(exp->typeExpr), tempTempExpr);
+                        tempExpr = msprintf("%%v%d", tempLoc);
+                    }
+                } else {
+                    tempExpr = generateExpr(scope, exp, needsCopy, file);
+                }
+                pushVector(exprVec, &tempExpr);
             }
         }
-        location = getNewNum();
+
+        int location = getNewNum();
         if (expr->typeExpr->type != TYP_VOID) {
             fprintf(file, "\t%%v%d =%s call $%.*s(", location,
                     generateType(expr->typeExpr), (int)expr->funcall.name.len,
@@ -109,19 +165,19 @@ static int generateExpr(Scope *scope, Expr *expr, FILE *file) {
         if (expr->funcall.arguments->numItems > 0) {
             for (size_t i = 0; i < expr->funcall.arguments->numItems - 1; i++) {
                 Expr *exp = *((Expr **)indexVector(expr->funcall.arguments, i));
-                int loc = *((int *)indexVector(posLoc, i));
-                pushVector(posLoc, &loc);
-                fprintf(file, "%s %%v%d, ", generateType(exp->typeExpr), loc);
+                char *expr = *((char **)indexVector(exprVec, i));
+                fprintf(file, "%s %s, ", generateType(exp->typeExpr), expr);
             }
             Expr *exp =
                 *((Expr **)indexVector(expr->funcall.arguments,
                                        expr->funcall.arguments->numItems - 1));
-            int loc = *((int *)indexVector(
-                posLoc, expr->funcall.arguments->numItems - 1));
-            fprintf(file, "%s %%v%d", generateType(exp->typeExpr), loc);
+            char *tempExpr = *((char **)indexVector(
+                exprVec, expr->funcall.arguments->numItems - 1));
+            fprintf(file, "%s %s", generateType(exp->typeExpr), tempExpr);
         }
         fprintf(file, ")\n");
-        return location;
+        *needsCopy = false;
+        return msprintf("%%%d", location);
     }
     case EXP_RECORDLIT:
         fprintf(file, "No funcalls or record lits yet.\n");
@@ -132,18 +188,25 @@ static int generateExpr(Scope *scope, Expr *expr, FILE *file) {
 
 static void generateStatement(Scope *scope, Stmt *stmt, FILE *file) {
 
+    bool copy;
     switch (stmt->type) {
     case STMT_DEC:
         /* noop */
         break;
     case STMT_EXPR:
-        generateExpr(scope, stmt->singleExpr, file);
+        generateExpr(scope, stmt->singleExpr, &copy, file);
         break;
     case STMT_ASSIGN: {
-        int position = generateExpr(scope, stmt->assign.value, file);
-        fprintf(file, "\t%%%.*s =%s copy %%v%d\n",
-                (int)stmt->assign.var->id.len, stmt->assign.var->id.text,
-                generateType(stmt->assign.value->typeExpr), position);
+        char *expr = generateExpr(scope, stmt->assign.value, &copy, file);
+        if (copy) {
+            fprintf(file, "\t%%%.*s =%s %s\n", (int)stmt->assign.var->id.len,
+                    stmt->assign.var->id.text,
+                    generateType(stmt->assign.value->typeExpr), expr);
+        } else {
+            fprintf(file, "\t%%%.*s =%s copy %s\n",
+                    (int)stmt->assign.var->id.len, stmt->assign.var->id.text,
+                    generateType(stmt->assign.value->typeExpr), expr);
+        }
         break;
     }
     case STMT_RETURN: {
@@ -151,16 +214,24 @@ static void generateStatement(Scope *scope, Stmt *stmt, FILE *file) {
 
             fprintf(file, "\tret\n");
         } else {
-            int position = generateExpr(scope, stmt->returnExp, file);
-            fprintf(file, "\tret %%v%d\n", position);
+            char *expr = generateExpr(scope, stmt->returnExp, &copy, file);
+            fprintf(file, "\tret %s\n", expr);
         }
         break;
     }
     case STMT_DEC_ASSIGN: {
-        int position = generateExpr(scope, stmt->dec_assign.value, file);
-        fprintf(file, "\t%%%.*s =%s copy %%v%d\n",
-                (int)stmt->dec_assign.var->id.len, stmt->assign.var->id.text,
-                generateType(stmt->dec_assign.value->typeExpr), position);
+        char *expr = generateExpr(scope, stmt->dec_assign.value, &copy, file);
+        if (copy) {
+            fprintf(file, "\t%%%.*s =%s copy %s\n",
+                    (int)stmt->dec_assign.var->id.len,
+                    stmt->assign.var->id.text,
+                    generateType(stmt->dec_assign.value->typeExpr), expr);
+        } else {
+            fprintf(file, "\t%%%.*s =%s %s\n",
+                    (int)stmt->dec_assign.var->id.len,
+                    stmt->assign.var->id.text,
+                    generateType(stmt->dec_assign.value->typeExpr), expr);
+        }
         break;
     }
     }

@@ -24,6 +24,7 @@ int main(int argc, char *argv[]) {
     char *outputname = NULL;
 
     bool makeExecutable = true;
+    bool printSSA = false;
 
     if (argc < 2) {
         printf("ERROR: Correct format: bcc (filename) [options].\n");
@@ -31,11 +32,15 @@ int main(int argc, char *argv[]) {
     }
     char *filename = argv[1];
 
-    while ((c = getopt(argc - 1, &argv[1], "co:")) != -1) {
+    while ((c = getopt(argc - 1, &argv[1], "sco:")) != -1) {
         switch (c) {
         case 'c':
             makeExecutable = false;
             break;
+        case 's':
+            printSSA = true;
+            break;
+
         case 'o':
             outputname = optarg;
             break;
@@ -80,6 +85,11 @@ int main(int argc, char *argv[]) {
     AST *ast = parseSource(&lex);
     resolveNames(ast);
     annotateAST(ast);
+    checkReturns(ast);
+
+    if (errorsExist()) {
+        printErrors();
+    }
 
     /*printAST(ast);*/
 
@@ -87,7 +97,11 @@ int main(int argc, char *argv[]) {
         printErrors();
     }
 
-    if (outputname == NULL) {
+    if (printSSA) {
+            generateCode(ast, stdout);
+    }
+
+    else if (outputname == NULL) {
         if (makeExecutable) {
             outputname = "a.out";
             FILE *file = fopen(outputname, "w");
