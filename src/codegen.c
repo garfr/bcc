@@ -354,6 +354,33 @@ static void generateStatement(Scope *scope, Stmt *stmt, FILE *file) {
         fprintf(file, "@loc%d\n", loc2);
         break;
     }
+    case STMT_IF_ELSE: {
+        char* expr = generateExpr(scope, stmt->if_else.cond, &copy, file);
+        int value1 = getNewNum();
+        if (copy) {
+            fprintf(file, "\t%%v%d =%s copy %s\n", value1, generateType(stmt->if_else.cond->typeExpr), expr);
+        }
+        else {
+            fprintf(file, "\t%%v%d =%s %s\n", value1, generateType(stmt->if_else.cond->typeExpr), expr);
+        }
+        int loc1 = getNewNum();
+        int loc2 = getNewNum();
+        int loc3 = getNewNum();
+        fprintf(file, "\tjnz %%v%d, @loc%d, @loc%d\n@loc%d\n", value1, loc1, loc2, loc1);
+
+        for (size_t i = 0; i < stmt->if_else.block1->numItems; i++) {
+            Stmt* tempStmt = *((Stmt**)indexVector(stmt->if_else.block1, i));
+            generateStatement(scope, tempStmt, file);
+        }
+        fprintf(file, "\tjmp @loc%d\n", loc3);
+        fprintf(file, "@loc%d\n", loc2);
+        for (size_t i = 0; i < stmt->if_else.block2->numItems; i++) {
+            Stmt* tempStmt = *((Stmt**)indexVector(stmt->if_else.block2, i));
+            generateStatement(scope, tempStmt, file);
+        }
+        fprintf(file, "@loc%d\n", loc3);
+        break;
+    }
     case STMT_DEC_ASSIGN: {
         char *expr = generateExpr(scope, stmt->dec_assign.value, &copy, file);
         if (copy) {
@@ -369,7 +396,7 @@ static void generateStatement(Scope *scope, Stmt *stmt, FILE *file) {
         }
         break;
     }
-    case STMT_IF_ELSE:
+default:
                           printf("Sorry, cant codegen flow control yet.\n");
                           exit(1);
     }
