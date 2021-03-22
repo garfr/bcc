@@ -761,9 +761,8 @@ Stmt *parseStmt(Parser *parser) {
         Expr* cond = parseExpr(parser);
 
         Token thenTok = nextToken(parser->lex);
-        if (thenTok.type != TOK_THEN) {
-
-            queueError("Expected keyword 'then' after expression", thenTok.start, thenTok.end);
+        if (thenTok.type != TOK_DO) {
+            queueError("Expected keyword 'do' after expression", thenTok.start, thenTok.end);
             thenTok = continueUntil(parser->lex, TOK_THEN_BITS);
         }
 
@@ -904,14 +903,16 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
 
     Vector *params = parseParams(parser->currentScope, parser);
 
-    Token arrowTok = nextToken(parser->lex);
-    if (arrowTok.type != TOK_ARROW) {
-        queueError("Expected '->' after function parameters", arrowTok.start,
-                   arrowTok.end);
-        arrowTok = continueUntil(parser->lex, TOK_ARROW_BITS);
-    }
+    Token arrowTok = peekToken(parser->lex);
+    Type* retType;
+    if (arrowTok.type == TOK_ARROW) {
+        nextToken(parser->lex);
 
-    Type *retType = parseType(parser);
+        retType = parseType(parser);
+    }
+    else {
+        retType = VoidType;
+    }
 
     if (peekToken(parser->lex).type == TOK_NEWLINE) {
         nextToken(parser->lex);
