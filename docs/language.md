@@ -12,6 +12,9 @@ proc myFun(arg : bool) -> void
 end
 ```
 
+The return type can also be inferred as void if it is omitted.
+
+
 A statement can be one of many forms, so instead of naming them all, I will just give examples.
 
 ## Statement Examples
@@ -101,7 +104,7 @@ functionName(var1, 3, 4 + 3)
 ## If Statements
 
 ```c
-if x == 3 then
+if x == 3 do
     doThing()
 else
     doOtherThing()
