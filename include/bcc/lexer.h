@@ -39,6 +39,7 @@ enum TokenType {
     TOK_COLONEQUAL,
     TOK_EQUAL,
     TOK_DOUBLEEQUAL,
+    TOK_NOTEQUAL,
     TOK_PLUS,
     TOK_PERIOD,
     TOK_LPAREN,
@@ -76,7 +77,8 @@ enum LexerState {
     LEX_DASH,
     LEX_COLON,
     LEX_SINGLE_QUOTE,
-    LEX_EQUAL
+    LEX_EQUAL,
+    LEX_EXCLAMATION
 };
 
 typedef struct {

@@ -1,3 +1,5 @@
+#include "bcc/lexer.h"
+
 #include <ctype.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -5,7 +7,6 @@
 #include <string.h>
 
 #include "bcc/error.h"
-#include "bcc/lexer.h"
 
 Lexer newLexer(const unsigned char *buffer, size_t bufferLen) {
     Lexer ret;
@@ -134,19 +135,19 @@ static Token makeCharBehind(Lexer *lex) {
 
 bool newlineNeeded(Lexer *lex) {
     switch (lex->previousTok.type) {
-    case TOK_INT:
-    case TOK_SYM:
-    case TOK_RPAREN:
-    case TOK_RBRACKET:
-    case TOK_RETURN:
-    case TOK_FALSE:
-    case TOK_TRUE:
-    case TOK_VOID:
-    case TOK_CHARLIT:
-    case TOK_CHAR:
-        return true;
-    default:
-        return false;
+        case TOK_INT:
+        case TOK_SYM:
+        case TOK_RPAREN:
+        case TOK_RBRACKET:
+        case TOK_RETURN:
+        case TOK_FALSE:
+        case TOK_TRUE:
+        case TOK_VOID:
+        case TOK_CHARLIT:
+        case TOK_CHAR:
+            return true;
+        default:
+            return false;
     }
 }
 
@@ -161,152 +162,176 @@ void skipline(Lexer *lex) {
 Token getToken(Lexer *lex) {
     for (;;) {
         switch (lex->state) {
-        case LEX_START: {
-            if (lex->endIdx >= lex->bufferLen) {
-                return makeTokenInplace(lex, TOK_EOF);
-            }
-            unsigned char c = lex->buffer[lex->endIdx];
-            if (isalpha(c)) {
-                lex->state = LEX_SYMBOL;
-                lex->endIdx++;
-                continue;
-            }
-            if (isdigit(c)) {
-                lex->state = LEX_INT;
-                lex->endIdx++;
-                continue;
-            }
-            if (c == '\n') {
-                if (newlineNeeded(lex)) {
-                    return makeTokenInplace(lex, TOK_NEWLINE);
+            case LEX_START: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeTokenInplace(lex, TOK_EOF);
                 }
-                lex->endIdx++;
-                lex->startIdx = lex->endIdx;
-                continue;
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (isalpha(c)) {
+                    lex->state = LEX_SYMBOL;
+                    lex->endIdx++;
+                    continue;
+                }
+                if (isdigit(c)) {
+                    lex->state = LEX_INT;
+                    lex->endIdx++;
+                    continue;
+                }
+                if (c == '\n') {
+                    if (newlineNeeded(lex)) {
+                        return makeTokenInplace(lex, TOK_NEWLINE);
+                    }
+                    lex->endIdx++;
+                    lex->startIdx = lex->endIdx;
+                    continue;
+                }
+                if (isspace(c)) {
+                    lex->endIdx++;
+                    lex->startIdx = lex->endIdx;
+                    continue;
+                }
+                switch (c) {
+                    case '-':
+                        lex->endIdx++;
+                        lex->state = LEX_DASH;
+                        continue;
+                    case '\'':
+                        lex->endIdx++;
+                        lex->startIdx = lex->endIdx;
+                        lex->state = LEX_SINGLE_QUOTE;
+                        continue;
+                    case ':':
+                        lex->endIdx++;
+                        lex->state = LEX_COLON;
+                        continue;
+                    case '=':
+                        lex->endIdx++;
+                        lex->state = LEX_EQUAL;
+                        continue;
+                    case '!':
+                        lex->endIdx++;
+                        lex->state = LEX_EXCLAMATION;
+                        continue;
+                    case '#':
+                        skipline(lex);
+                        continue;
+                    case ';':
+                        return makeTokenInplace(lex, TOK_SEMICOLON);
+                    case '+':
+                        return makeTokenInplace(lex, TOK_PLUS);
+                    case '*':
+                        return makeTokenInplace(lex, TOK_STAR);
+                    case ')':
+                        return makeTokenInplace(lex, TOK_RPAREN);
+                    case '(':
+                        return makeTokenInplace(lex, TOK_LPAREN);
+                    case ',':
+                        return makeTokenInplace(lex, TOK_COMMA);
+                    case '.':
+                        return makeTokenInplace(lex, TOK_PERIOD);
+                    case '{':
+                        return makeTokenInplace(lex, TOK_LBRACKET);
+                    case '}':
+                        return makeTokenInplace(lex, TOK_RBRACKET);
+                    case '/':
+                        return makeTokenInplace(lex, TOK_SLASH);
+                    default: {
+                        char *buffer =
+                            msprintf("Unexpected character: '%c'", c);
+                        queueError(buffer, lex->startIdx, lex->endIdx);
+                        lex->endIdx++;
+                        lex->startIdx = lex->endIdx;
+                        continue;
+                    }
+                }
             }
-            if (isspace(c)) {
-                lex->endIdx++;
-                lex->startIdx = lex->endIdx;
-                continue;
-            }
-            switch (c) {
-            case '-':
-                lex->endIdx++;
-                lex->state = LEX_DASH;
-                continue;
-            case '\'':
-                lex->endIdx++;
-                lex->startIdx = lex->endIdx;
-                lex->state = LEX_SINGLE_QUOTE;
-                continue;
-            case ':':
-                lex->endIdx++;
-                lex->state = LEX_COLON;
-                continue;
-            case '=':
-                lex->endIdx++;
-                lex->state = LEX_EQUAL;
-                continue;
-            case '#':
-                skipline(lex);
-                continue;
-            case ';':
-                return makeTokenInplace(lex, TOK_SEMICOLON);
-            case '+':
-                return makeTokenInplace(lex, TOK_PLUS);
-            case '*':
-                return makeTokenInplace(lex, TOK_STAR);
-            case ')':
-                return makeTokenInplace(lex, TOK_RPAREN);
-            case '(':
-                return makeTokenInplace(lex, TOK_LPAREN);
-            case ',':
-                return makeTokenInplace(lex, TOK_COMMA);
-            case '.':
-                return makeTokenInplace(lex, TOK_PERIOD);
-            case '{':
-                return makeTokenInplace(lex, TOK_LBRACKET);
-            case '}':
-                return makeTokenInplace(lex, TOK_RBRACKET);
-            case '/':
-                return makeTokenInplace(lex, TOK_SLASH);
-            default: {
-                char *buffer = msprintf("Unexpected character: '%c'", c);
-                queueError(buffer, lex->startIdx, lex->endIdx);
-                lex->endIdx++;
-                lex->startIdx = lex->endIdx;
-                continue;
-            }
-            }
-        }
-        case LEX_DASH: {
-            if (lex->endIdx >= lex->bufferLen) {
+            case LEX_DASH: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeTokenBehind(lex, TOK_MINUS);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (c == '>') {
+                    return makeTokenInplace(lex, TOK_ARROW);
+                }
                 return makeTokenBehind(lex, TOK_MINUS);
             }
-            unsigned char c = lex->buffer[lex->endIdx];
-            if (c == '>') {
-                return makeTokenInplace(lex, TOK_ARROW);
-            }
-            return makeTokenBehind(lex, TOK_MINUS);
-        }
-        case LEX_EQUAL: {
-            if (lex->endIdx >= lex->bufferLen) {
+            case LEX_EQUAL: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeTokenBehind(lex, TOK_EQUAL);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (c == '=') {
+                    return makeTokenInplace(lex, TOK_DOUBLEEQUAL);
+                }
                 return makeTokenBehind(lex, TOK_EQUAL);
             }
-            unsigned char c = lex->buffer[lex->endIdx];
-            if (c == '=') {
-                return makeTokenInplace(lex, TOK_DOUBLEEQUAL);
-            }
-            return makeTokenBehind(lex, TOK_EQUAL);
-        }
-        case LEX_COLON: {
-            if (lex->endIdx >= lex->bufferLen) {
+            case LEX_COLON: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeTokenBehind(lex, TOK_COLON);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (c == ':') {
+                    return makeTokenInplace(lex, TOK_DOUBLECOLON);
+                } else if (c == '=') {
+                    return makeTokenInplace(lex, TOK_COLONEQUAL);
+                }
                 return makeTokenBehind(lex, TOK_COLON);
             }
-            unsigned char c = lex->buffer[lex->endIdx];
-            if (c == ':') {
-                return makeTokenInplace(lex, TOK_DOUBLECOLON);
-            } else if (c == '=') {
-                return makeTokenInplace(lex, TOK_COLONEQUAL);
+            case LEX_EXCLAMATION: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    queueError("Unexpected eof after '!'", lex->endIdx,
+                               lex->endIdx);
+                    printErrors();
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (c == '=') {
+                    return makeTokenInplace(lex, TOK_NOTEQUAL);
+                } else {
+                    queueError(
+                        msprintf("Unexpected character '%c' after '!'", c),
+                        lex->endIdx, lex->endIdx);
+                    lex->endIdx++;
+                    lex->startIdx = lex->endIdx;
+                    lex->state = LEX_START;
+                    continue;
+                }
             }
-            return makeTokenBehind(lex, TOK_COLON);
-        }
-        case LEX_SYMBOL: {
-            if (lex->endIdx >= lex->bufferLen) {
-                return makeSymbolBehind(lex);
+            case LEX_SYMBOL: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeSymbolBehind(lex);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (isalpha(c) || isdigit(c) || c == '_') {
+                    lex->endIdx++;
+                    continue;
+                } else {
+                    return makeSymbolBehind(lex);
+                }
             }
-            unsigned char c = lex->buffer[lex->endIdx];
-            if (isalpha(c) || isdigit(c) || c == '_') {
-                lex->endIdx++;
-                continue;
-            } else {
-                return makeSymbolBehind(lex);
-            }
-        }
 
-        case LEX_INT: {
-            if (lex->endIdx >= lex->bufferLen) {
-                return makeIntBehind(lex);
+            case LEX_INT: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeIntBehind(lex);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (isdigit(c)) {
+                    lex->endIdx++;
+                    continue;
+                } else {
+                    return makeIntBehind(lex);
+                }
             }
-            unsigned char c = lex->buffer[lex->endIdx];
-            if (isdigit(c)) {
-                lex->endIdx++;
-                continue;
-            } else {
-                return makeIntBehind(lex);
+            case LEX_SINGLE_QUOTE: {
+                if (lex->endIdx >= lex->bufferLen) {
+                    return makeCharBehind(lex);
+                }
+                unsigned char c = lex->buffer[lex->endIdx];
+                if (c == '\'') {
+                    return makeCharBehind(lex);
+                } else {
+                    lex->endIdx++;
+                }
             }
-        }
-        case LEX_SINGLE_QUOTE: {
-            if (lex->endIdx >= lex->bufferLen) {
-                return makeCharBehind(lex);
-            }
-            unsigned char c = lex->buffer[lex->endIdx];
-            if (c == '\'') {
-                return makeCharBehind(lex);
-            } else {
-                lex->endIdx++;
-            }
-        }
         }
     }
 }

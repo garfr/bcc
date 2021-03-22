@@ -1,56 +1,12 @@
+#include "bcc/codegen.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "bcc/codegen.h"
+#include "bcc/pp.h"
 
 const char *generateType(Type *type) {
-
     switch (type->type) {
-
-    case TYP_S8:
-    case TYP_U8:
-    case TYP_S16:
-    case TYP_U16:
-    case TYP_S32:
-    case TYP_U32:
-    case TYP_BOOL:
-    case TYP_INTLIT:
-    case TYP_CHAR:
-        return "l";
-    case TYP_S64:
-    case TYP_U64:
-    case TYP_FUN:
-
-        return "w";
-    case TYP_VOID:
-        return "";
-    case TYP_BINDING:
-        return generateType(type->typeEntry->data);
-    default:
-        printf("These types dont work yet.\n");
-        exit(1);
-    }
-}
-
-int getNewNum() {
-    static int cnt = 0;
-    return cnt++;
-}
-
-char *generateBinaryOp(int op, Type *type) {
-
-    switch (op) {
-
-    case BINOP_ADD:
-        return "add";
-    case BINOP_SUB:
-        return "sub";
-    case BINOP_MULT:
-        return "mul";
-    case BINOP_DIV:
-        return "div";
-    case BINOP_EQUAL:
-        switch (type->type) {
         case TYP_S8:
         case TYP_U8:
         case TYP_S16:
@@ -60,44 +16,85 @@ char *generateBinaryOp(int op, Type *type) {
         case TYP_BOOL:
         case TYP_INTLIT:
         case TYP_CHAR:
-        case TYP_VOID:
-            return "ceql";
+            return "l";
         case TYP_S64:
         case TYP_U64:
         case TYP_FUN:
-        case TYP_RECORD:
-            return "ceqw";
+
+            return "w";
+        case TYP_VOID:
+            return "";
         case TYP_BINDING:
-            return generateBinaryOp(op, type->typeEntry->data);
-        }
-        break;
-    default:
-        printf("Invalid binary operation.\n");
-        exit(1);
+            return generateType(type->typeEntry->data);
+        default:
+            printf("These types dont work yet.\n");
+            exit(1);
+    }
+}
+
+int getNewNum() {
+    static int cnt = 0;
+    return cnt++;
+}
+
+char *generateBinaryOp(int op, Type *type) {
+    switch (op) {
+        case BINOP_ADD:
+            return "add";
+        case BINOP_SUB:
+            return "sub";
+        case BINOP_MULT:
+            return "mul";
+        case BINOP_DIV:
+            return "div";
+        case BINOP_EQUAL:
+        case BINOP_NOTEQUAL:
+            switch (type->type) {
+                case TYP_S8:
+                case TYP_U8:
+                case TYP_S16:
+                case TYP_U16:
+                case TYP_S32:
+                case TYP_U32:
+                case TYP_BOOL:
+                case TYP_INTLIT:
+                case TYP_CHAR:
+                case TYP_VOID:
+                    return "ceql";
+                case TYP_S64:
+                case TYP_U64:
+                case TYP_FUN:
+                case TYP_RECORD:
+                    return "ceqw";
+                case TYP_BINDING:
+                    return generateBinaryOp(op, type->typeEntry->data);
+            }
+            break;
+        default:
+            printf("Invalid binary operation.\n");
+            exit(1);
     }
     return NULL;
 }
 
 bool needsOwnInstruction(Expr *exp) {
-
     switch (exp->type) {
-    case EXP_INT:
-    case EXP_VAR:
-    case EXP_BOOL:
-    case EXP_CHAR:
-        return false;
-    case EXP_BINOP:
-    case EXP_FUNCALL:
-    case EXP_RECORDLIT:
-        return true;
-    default:
-        printf("ERROR: Unexpected exp enum: %d\n", exp->type);
-        exit(1);
+        case EXP_INT:
+        case EXP_VAR:
+        case EXP_BOOL:
+        case EXP_CHAR:
+            return false;
+        case EXP_BINOP:
+        case EXP_FUNCALL:
+        case EXP_RECORDLIT:
+            return true;
+        default:
+            printf("ERROR: Unexpected exp enum: %d\n", exp->type);
+            exit(1);
     }
 }
 
 int translateCharacter(Symbol sym) {
-
     // clang-format off
     if (sym.len >= 1){
         if (sym.text[0] == '\\') {
@@ -114,6 +111,119 @@ int translateCharacter(Symbol sym) {
     printf("Symbol too short.\n");
     exit(1);
 }
+
+
+char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy, FILE *file);
+
+/* And will not evaluate the right hand side if the first value evaluates to false */
+char *generateAnd(Scope *scope, Expr *expr, bool *needsCopy, FILE *file) { 
+
+    int loc1 = getNewNum();
+
+    char *tempExpr1 =
+        generateExpr(scope, expr->binop.exp1, needsCopy, file);
+    if (*needsCopy) {
+        fprintf(file, "\t%%v%d =%s copy %s\n", loc1,
+                generateType(expr->typeExpr), tempExpr1);
+    } else {
+        fprintf(file, "\t%%v%d =%s %s\n", loc1,
+                generateType(expr->typeExpr), tempExpr1);
+    }
+
+    int jmp1 = getNewNum();
+    int jmp2 = getNewNum();
+    int jmp3 = getNewNum();
+    int jmp4 = getNewNum();
+
+    fprintf(file, "\tjnz %%v%d, @j%d, @j%d\n", loc1, jmp1, jmp3);
+    fprintf(file, "@j%d\n", jmp1);
+
+    int loc2 = getNewNum();
+
+    char *tempExpr2 =
+        generateExpr(scope, expr->binop.exp2, needsCopy, file);
+
+    if (*needsCopy) {
+        fprintf(file, "\t%%v%d =%s copy %s\n", loc2,
+                generateType(expr->typeExpr), tempExpr2);
+    } else {
+        fprintf(file, "\t%%v%d =%s %s\n", loc2,
+                generateType(expr->typeExpr), tempExpr2);
+    }
+
+    fprintf(file, "\tjnz %%v%d, @j%d, @j%d\n", loc2, jmp2, jmp3);
+
+    fprintf(file, "@j%d\n",  jmp2);
+
+    int loc3 = getNewNum();
+
+    fprintf(file, "\t%%v%d =l copy 1\n", loc3);
+    fprintf(file, "\tjmp @j%d\n", jmp4);
+
+    fprintf(file, "@j%d\n", jmp3);
+    fprintf(file, "\t%%v%d =l copy 0\n", loc3);
+    fprintf(file, "@j%d\n", jmp4);
+
+    *needsCopy = true;
+
+    return msprintf("%%v%d", loc3);
+}
+
+/*Or will not evaluate the right hand side if the first value evaluates to true */
+char *generateOr(Scope *scope, Expr *expr, bool *needsCopy, FILE *file) { 
+
+
+    int loc1 = getNewNum();
+
+    char *tempExpr1 =
+        generateExpr(scope, expr->binop.exp1, needsCopy, file);
+    if (*needsCopy) {
+        fprintf(file, "\t%%v%d =%s copy %s\n", loc1,
+                generateType(expr->typeExpr), tempExpr1);
+    } else {
+        fprintf(file, "\t%%v%d =%s %s\n", loc1,
+                generateType(expr->typeExpr), tempExpr1);
+    }
+
+    int jmp1 = getNewNum();
+    int jmp2 = getNewNum();
+    int jmp3 = getNewNum();
+    int jmp4 = getNewNum();
+
+    fprintf(file, "\tjnz %%v%d, @j%d, @j%d\n", loc1, jmp2, jmp1);
+    fprintf(file, "@j%d\n", jmp1);
+
+    int loc2 = getNewNum();
+
+    char *tempExpr2 =
+        generateExpr(scope, expr->binop.exp2, needsCopy, file);
+
+    if (*needsCopy) {
+        fprintf(file, "\t%%v%d =%s copy %s\n", loc2,
+                generateType(expr->typeExpr), tempExpr2);
+    } else {
+        fprintf(file, "\t%%v%d =%s %s\n", loc2,
+                generateType(expr->typeExpr), tempExpr2);
+    }
+
+    fprintf(file, "\tjnz %%v%d, @j%d, @j%d\n", loc2, jmp2, jmp3);
+
+    fprintf(file, "@j%d\n",  jmp2);
+
+    int loc3 = getNewNum();
+
+    fprintf(file, "\t%%v%d =l copy 1\n", loc3);
+    fprintf(file, "\tjmp @j%d\n", jmp4);
+
+    fprintf(file, "@j%d\n", jmp3);
+    fprintf(file, "\t%%v%d =l copy 0\n", loc3);
+    fprintf(file, "@j%d\n", jmp4);
+
+    *needsCopy = true;
+
+    return msprintf("%%v%d", loc3);
+}
+
 
 char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy, FILE *file) {
     switch (expr->type) {
@@ -135,24 +245,31 @@ char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy, FILE *file) {
         *needsCopy = true;
         return msprintf("%d", translateCharacter(expr->character));
     case EXP_BINOP: {
+        if (expr->binop.op == BINOP_AND) {
+            return generateAnd(scope, expr, needsCopy, file);
+        }
+        if (expr->binop.op == BINOP_OR) {
+            return generateOr(scope, expr, needsCopy, file);
+        }
+
         int loc1 = getNewNum();
         int loc2 = getNewNum();
 
-        char *tempExpr1 =
+        char *tempexpr1 =
             generateExpr(scope, expr->binop.exp1, needsCopy, file);
         char *expr1;
         if (needsOwnInstruction(expr->binop.exp1)) {
             if (*needsCopy) {
                 fprintf(file, "\t%%v%d =%s %s\n", loc1,
-                        generateType(expr->typeExpr), tempExpr1);
+                        generateType(expr->typeExpr), tempexpr1);
 
             } else {
                 fprintf(file, "\t%%v%d =%s copy %s\n", loc1,
-                        generateType(expr->typeExpr), tempExpr1);
+                        generateType(expr->typeExpr), tempexpr1);
             }
             expr1 = msprintf("%%v%d", loc1);
         } else {
-            expr1 = tempExpr1;
+            expr1 = tempexpr1;
         }
 
         char *tempExpr2 =
@@ -230,8 +347,8 @@ char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy, FILE *file) {
             fprintf(file, "%s %s", generateType(exp->typeExpr), tempExpr);
         }
         fprintf(file, ")\n");
-        *needsCopy = false;
-        return msprintf("%%%d", location);
+        *needsCopy = true;
+        return msprintf("%%v%d", location);
     }
     case EXP_RECORDLIT:
         printf("No funcalls or record lits yet.\n");

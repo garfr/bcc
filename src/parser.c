@@ -443,6 +443,8 @@ int parseBinop(Parser *parser) {
         return BINOP_DIV;
     case TOK_DOUBLEEQUAL:
         return BINOP_EQUAL;
+    case TOK_NOTEQUAL:
+        return BINOP_NOTEQUAL;
     case TOK_AND:
         return BINOP_AND;
     case TOK_OR:
@@ -495,7 +497,7 @@ Expr *parseTerm(Parser *parser) {
 Expr *parseComparison(Parser *parser) {
     Expr *exp = parseTerm(parser);
 
-    while (peekToken(parser->lex).type == TOK_DOUBLEEQUAL) {
+    while (peekToken(parser->lex).type == TOK_DOUBLEEQUAL || peekToken(parser->lex).type == TOK_NOTEQUAL) {
         int op = parseBinop(parser);
         Expr *right = parseTerm(parser);
         Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);

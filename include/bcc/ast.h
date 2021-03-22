@@ -30,13 +30,13 @@ typedef struct Type {
 
     union {
         struct {
-            Vector *args; // Types*
+            Vector *args;  // Types*
             struct Type *retType;
         } fun;
         HashEntry *typeEntry;
         struct {
-            Hashtbl *recordFields; // RecordField
-            Vector *vec; // A linear list of HashEntries, that represents the
+            Hashtbl *recordFields;  // RecordField
+            Vector *vec;  // A linear list of HashEntries, that represents the
         } record;
     };
 } Type;
@@ -75,15 +75,16 @@ typedef struct Expr {
                 BINOP_MULT,
                 BINOP_DIV,
                 BINOP_EQUAL,
+                BINOP_NOTEQUAL,
                 BINOP_AND,
                 BINOP_OR,
             } op;
         } binop;
 
         struct {
-            Vector *arguments; // Expr*
-            Symbol name;       // This is kept so function declarations can be
-                               // resolved without forward declarations
+            Vector *arguments;  // Expr*
+            Symbol name;        // This is kept so function declarations can be
+                                // resolved without forward declarations
             HashEntry *entry;
         } funcall;
 
@@ -116,13 +117,13 @@ typedef struct Stmt {
         } dec;
 
         struct {
-            Vector *block; // Stmt*
+            Vector *block;  // Stmt*
             Expr *cond;
         } if_block;
 
         struct {
-            Vector *block1; // Stmt*
-            Vector *block2; // Stmt*
+            Vector *block1;  // Stmt*
+            Vector *block2;  // Stmt*
             Expr *cond;
         } if_else;
 
@@ -151,9 +152,9 @@ typedef struct {
 
 struct Function {
     Symbol name;
-    Vector *params; // Param
+    Vector *params;  // Param
     Type *retType;
-    Vector *stmts; // *Stmt
+    Vector *stmts;  // *Stmt
     Scope *scope;
 
     size_t start;
@@ -166,7 +167,7 @@ typedef struct {
     Type *type;
     int64_t stackOffset;
     bool isMut;
-    Function *fun; // Function pointers
+    Function *fun;  // Function pointers
 } TypedEntry;
 
 typedef struct {
@@ -188,6 +189,6 @@ typedef struct {
 /* The full abstract syntax tree that currently is just a vector of
  * statments and a global scope */
 typedef struct {
-    Vector *decs; // Toplevel
+    Vector *decs;  // Toplevel
     Scope *globalScope;
 } AST;
