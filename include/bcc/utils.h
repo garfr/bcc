@@ -80,3 +80,5 @@ typedef struct Scope {
 
 /* Searches through a scope to find an entry for a symbol */
 HashEntry *findInScope(Scope *scope, Symbol sym);
+Scope *newScope(Scope *upScope);
+

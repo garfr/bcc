@@ -65,6 +65,13 @@ Token continueUntil(Lexer *lex, int bitFlags) {
     return tok;
 }
 
+void pushScope(Parser *parser) {
+    Scope* sc = newScope(parser->currentScope);
+
+    parser->currentScope = sc;
+}
+
+
 /* Creates a new expression with the same position information as given
  * token */
 Expr *exprFromToken(Token tok, enum ExprType type) {
@@ -760,13 +767,22 @@ Stmt *parseStmt(Parser *parser) {
             thenTok = continueUntil(parser->lex, TOK_THEN_BITS);
         }
 
-
-
         Vector * block1 = newVector(sizeof(Stmt*), 0);
+
+        Scope* oldScope = parser->currentScope;
+
+        pushScope(parser);
+        if (parser->currentScope == NULL) {
+
+            printf("whyu this nukl\n");
+        }
         while (peekToken(parser->lex).type != TOK_END && peekToken(parser->lex).type != TOK_ELSE) {
             Stmt * tempStmt = parseStmt(parser);
             pushVector(block1, &tempStmt);
         }
+
+        Scope* scope1 = parser->currentScope;
+        parser->currentScope = oldScope;
 
         Token elseEndTok = nextToken(parser->lex);
         if (elseEndTok.type == TOK_END) {
@@ -774,15 +790,25 @@ Stmt *parseStmt(Parser *parser) {
             ret->type = STMT_IF;
             ret->if_block.block = block1;
             ret->if_block.cond = cond ;
+            ret->if_block.scope = scope1;
             return ret;
         }
+
         if (elseEndTok.type == TOK_ELSE) {
             Vector* block2 = newVector(sizeof(Stmt*), 0);
 
+            oldScope = parser->currentScope;
+
+            pushScope(parser);
             while (peekToken(parser->lex).type != TOK_END) {
                 Stmt * tempStmt = parseStmt(parser);
                 pushVector(block2, &tempStmt);
             }
+
+            Scope* scope2 = parser->currentScope;
+            parser->currentScope = oldScope;
+
+            // Skip the end token
             nextToken(parser->lex);
 
             Stmt* ret = calloc(1, sizeof(Stmt));
@@ -790,6 +816,8 @@ Stmt *parseStmt(Parser *parser) {
             ret->if_else.block1 = block1;
             ret->if_else.block2 = block2;
             ret->if_else.cond = cond;
+            ret->if_else.scope1 = scope1;
+            ret->if_else.scope2 = scope2;
             return ret;
         }
         return NULL;
@@ -872,10 +900,7 @@ Function *parseFunction(Parser *parser, Token keywordTok) {
     }
 
     /* Allocate a new scope for the function */
-    Scope *newScope = calloc(1, sizeof(Scope));
-    newScope->upScope = parser->currentScope;
-    newScope->vars = newHashtbl(0);
-    parser->currentScope = newScope;
+    parser->currentScope = newScope(parser->currentScope);
 
     Vector *params = parseParams(parser->currentScope, parser);
 

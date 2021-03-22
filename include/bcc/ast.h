@@ -108,7 +108,6 @@ typedef struct Stmt {
         STMT_EXPR,
         STMT_IF,
         STMT_IF_ELSE,
-
     } type;
 
     union {
@@ -117,11 +116,14 @@ typedef struct Stmt {
         } dec;
 
         struct {
+            Scope *scope;
             Vector *block;  // Stmt*
             Expr *cond;
         } if_block;
 
         struct {
+            Scope *scope1;
+            Scope *scope2;
             Vector *block1;  // Stmt*
             Vector *block2;  // Stmt*
             Expr *cond;

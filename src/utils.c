@@ -1,10 +1,10 @@
+#include "bcc/utils.h"
+
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "bcc/utils.h"
 
 /* ------------------------------ Helpers ---------------------------------- */
 
@@ -75,11 +75,9 @@ Hashtbl *newHashtbl(size_t initBuckets) {
 size_t spow(size_t base, size_t exp) {
     size_t result = 1;
     for (;;) {
-        if (exp & 1)
-            result *= base;
+        if (exp & 1) result *= base;
         exp >>= 1;
-        if (!exp)
-            break;
+        if (!exp) break;
         base *= base;
     }
 
@@ -210,3 +208,11 @@ HashEntry *findInScope(Scope *scope, Symbol sym) {
     }
     return NULL;
 }
+
+Scope *newScope(Scope *upScope) {
+    Scope *sc = calloc(1, sizeof(Scope));
+    sc->upScope = upScope;
+    sc->vars = newHashtbl(0);
+    return sc;
+}
+
