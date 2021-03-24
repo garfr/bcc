@@ -469,10 +469,12 @@ int parseBinop(Parser *parser) {
 
 Expr *parseUnary(Parser *parser) {
     if (peekToken(parser->lex).type == TOK_AMPERSAND) {
-        nextToken(parser->lex);
+        Token startTok = nextToken(parser->lex);
         Expr *right  = parseUnary(parser);
         Expr *ret = calloc(1, sizeof(Expr));
         ret->type = EXP_ADDROF;
+        ret->start = startTok.start;
+        ret->end = right->end;
         ret->addrOf = right;
         return ret;
     }

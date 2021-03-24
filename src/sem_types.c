@@ -86,6 +86,11 @@ Type *coerceBinop(int op, Type *type1, Type *type2) {
     if (type1->type == TYP_FUN || type1->type == TYP_RECORD) {
         return NULL;
     }
+    if (type1->type == TYP_PTR && type2->type == TYP_PTR) {
+        /*printType(type1->ptrType);*/
+        /*printType(type2->ptrType);*/
+        return coerceBinop(op, type1->ptrType, type2->ptrType);
+    }
     switch (op) {
         case BINOP_ADD:
         case BINOP_SUB:
@@ -223,6 +228,9 @@ Type *coerceAssignment(Type *type1, Type *type2) {
                 return NULL;
         }
     }
+    if (type1->type == TYP_PTR && type2->type == TYP_PTR) {
+        return coerceAssignment(type1->ptrType, type2->ptrType);
+    }
     if (type1->type == type2->type) {
         return type1;
     }
@@ -265,12 +273,14 @@ void typeExpression(Scope *scope, Expr *exp) {
                 }
             }
         } break;
-        case EXP_ADDROF:
+        case EXP_ADDROF: {
             typeExpression(scope, exp->addrOf);
-            exp->typeExpr = calloc(1, sizeof(Type));
-            exp->typeExpr->type = TYP_PTR;
-            exp->typeExpr->ptrType = exp->typeExpr;
+            Type *newType = calloc(1, sizeof(Type));
+            newType->type = TYP_PTR;
+            newType->ptrType = exp->addrOf->typeExpr;
+            exp->typeExpr = newType;
             break;
+        }
         case EXP_INT:
             exp->typeExpr = IntegerLit;
             break;
