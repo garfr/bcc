@@ -80,10 +80,12 @@ const char *generateType(Type *type) {
             return "";
         case TYP_BINDING:
             return generateType(type->typeEntry->data);
-        default:
+        case TYP_RECORD:
             printf("These types dont work yet.\n");
             exit(1);
     }
+    assert(false);
+    return NULL;
 }
 
 int getNewNum() {
@@ -324,22 +326,28 @@ char* pickStoreInst(Type* type) {
             return "storeh";
         case TYP_S32:
         case TYP_U32:
+        case TYP_CHAR:
+        case TYP_BOOL:
             return "storew";
         case TYP_S64:
         case TYP_U64:
-            return "storel";
-        case TYP_BOOL:
-            return "storew";
-        case TYP_CHAR:
-            return "storew";
+        case TYP_PTR:
         case TYP_FUN:
             return "storel";
         case TYP_BINDING:
             return pickStoreInst(type->typeEntry->data);
-        default:
             printf("These types dont work yet.\n");
             exit(1);
+        case TYP_VOID:
+        case TYP_INTLIT:
+        case TYP_RECORD:
+
+        assert(false);
+        return NULL;
+
     }
+    assert(false);
+    return NULL;
 }
 
 char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {

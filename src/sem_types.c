@@ -61,6 +61,7 @@ char *stringOfType(Type *type) {
         case TYP_RECORD:
             return "record";
     }
+    assert(false);
     return NULL;
 }
 
@@ -287,6 +288,7 @@ void typeExpression(Scope *scope, Expr *exp) {
                 queueError(msprintf("Cannot dereference type '%s'",
                                     stringOfType(exp->deref->typeExpr)),
                            exp->start, exp->end);
+                printErrors();
             }
             exp->typeExpr = exp->deref->typeExpr->ptrType;
             break;

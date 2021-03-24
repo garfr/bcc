@@ -851,7 +851,7 @@ Stmt *parseStmt(Parser *parser) {
         Expr *expr = parseExpr(parser);
 
         Token semiTok = nextToken(parser->lex);
-        if (semiTok.type != TOK_SEMICOLON) {
+        if (semiTok.type != TOK_SEMICOLON && semiTok.type != TOK_NEWLINE) {
             queueError("Expected ';' after expression parsed as a standalone "
                        "statement",
                        expr->start, semiTok.end);
