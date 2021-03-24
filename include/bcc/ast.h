@@ -113,6 +113,7 @@ typedef struct Stmt {
     union {
         struct {
             HashEntry *var;
+            Type *type;
         } dec;
 
         struct {
@@ -167,8 +168,8 @@ struct Function {
  * This will grow as more information is collected */
 typedef struct {
     Type *type;
-    int64_t stackOffset;
     bool isMut;
+    bool onStack;
     Function *fun;  // Function pointers
 } TypedEntry;
 

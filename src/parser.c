@@ -102,6 +102,7 @@ static HashEntry *addToScope(Scope *scope, Symbol sym, bool isMut) {
     TypedEntry *entry = calloc(1, sizeof(TypedEntry));
     entry->isMut = isMut;
     entry->type = NULL;
+    entry->onStack = true;
     return insertHashtbl(scope->vars, sym, entry);
 }
 

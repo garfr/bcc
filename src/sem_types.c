@@ -392,17 +392,14 @@ int64_t calculateSize(Type *type) {
 
 /* Adds type information to a statment, including inserting any needed
  * information into the symbol table */
-void typeStmt(Scope *scope, Stmt *stmt, int64_t *stackSpace) {
+void typeStmt(Scope *scope, Stmt *stmt) {
     assert(scope != NULL);
     assert(stmt != NULL);
 
     switch (stmt->type) {
         /* This should have gotten typed before hand */
-        case STMT_DEC: {
-            TypedEntry *entry = stmt->dec.var->data;
-            entry->stackOffset = *stackSpace;
-            *stackSpace += calculateSize(entry->type);
-        } break;
+        case STMT_DEC:
+            break;
 
         case STMT_EXPR:
             typeExpression(scope, stmt->singleExpr);
@@ -427,7 +424,7 @@ void typeStmt(Scope *scope, Stmt *stmt, int64_t *stackSpace) {
             for (size_t i = 0; i < stmt->if_block.block->numItems; i++) {
                 Stmt *tempStmt =
                     *((Stmt **)indexVector(stmt->if_block.block, i));
-                typeStmt(scope, tempStmt, stackSpace);
+                typeStmt(scope, tempStmt);
             }
             break;
         }
@@ -443,12 +440,12 @@ void typeStmt(Scope *scope, Stmt *stmt, int64_t *stackSpace) {
             for (size_t i = 0; i < stmt->if_else.block1->numItems; i++) {
                 Stmt *tempStmt =
                     *((Stmt **)indexVector(stmt->if_else.block1, i));
-                typeStmt(scope, tempStmt, stackSpace);
+                typeStmt(scope, tempStmt);
             }
             for (size_t i = 0; i < stmt->if_else.block2->numItems; i++) {
                 Stmt *tempStmt =
                     *((Stmt **)indexVector(stmt->if_else.block2, i));
-                typeStmt(scope, tempStmt, stackSpace);
+                typeStmt(scope, tempStmt);
             }
             break;
         }
@@ -487,8 +484,6 @@ void typeStmt(Scope *scope, Stmt *stmt, int64_t *stackSpace) {
 
             TypedEntry *entry = stmt->dec_assign.var->data;
             entry->type = type;
-            entry->stackOffset = *stackSpace;
-            *stackSpace += calculateSize(entry->type);
         } break;
         case STMT_RETURN: {
             if (stmt->returnExp != NULL) {
@@ -536,11 +531,9 @@ void typeToplevel(Toplevel *top) {
         case TOP_EXTERN:
             break;
         case TOP_PROC: {
-            int64_t stackSize = 0;
             for (size_t i = 0; i < top->fn->stmts->numItems; i++) {
                 typeStmt(top->fn->scope,
-                         *((Stmt **)indexVector(top->fn->stmts, i)),
-                         &stackSize);
+                         *((Stmt **)indexVector(top->fn->stmts, i)));
             }
         }
     }
