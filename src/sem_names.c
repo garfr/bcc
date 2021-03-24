@@ -35,11 +35,15 @@ void resolveExpr(Scope *scope, Expr *exp) {
         break;
     case EXP_ADDROF:
         resolveExpr(scope, exp->addrOf);
+        break;
+    case EXP_DEREF:
+        resolveExpr(scope, exp->deref);
+        break;
     case EXP_INT:
     case EXP_BOOL:
     case EXP_VAR:
     case EXP_CHAR:
-        return;
+        break;
     case EXP_RECORDLIT: {
         for (size_t i = 0; i < exp->reclit.fields->entries; i++) {
             for (HashEntry *entry = exp->reclit.fields->buckets[i];

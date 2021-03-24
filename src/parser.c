@@ -468,18 +468,30 @@ int parseBinop(Parser *parser) {
 }
 
 Expr *parseUnary(Parser *parser) {
-    if (peekToken(parser->lex).type == TOK_AMPERSAND) {
-        Token startTok = nextToken(parser->lex);
-        Expr *right  = parseUnary(parser);
-        Expr *ret = calloc(1, sizeof(Expr));
-        ret->type = EXP_ADDROF;
-        ret->start = startTok.start;
-        ret->end = right->end;
-        ret->addrOf = right;
-        return ret;
+    switch (peekToken(parser->lex).type) {
+        case TOK_AT:{
+            Token startTok = nextToken(parser->lex);
+            Expr *right  = parseUnary(parser);
+            Expr *ret = calloc(1, sizeof(Expr));
+            ret->type = EXP_DEREF;
+            ret->start = startTok.start;
+            ret->end = right->end;
+            ret->deref = right;
+            return ret;
+        }
+        case TOK_AMPERSAND: {
+            Token startTok = nextToken(parser->lex);
+            Expr *right  = parseUnary(parser);
+            Expr *ret = calloc(1, sizeof(Expr));
+            ret->type = EXP_ADDROF;
+            ret->start = startTok.start;
+            ret->end = right->end;
+            ret->addrOf = right;
+            return ret;
+        };
+        default:
+            return parsePrimary(parser);
     }
-
-    return parsePrimary(parser);
 }
 
 Expr *parseFactor(Parser *parser) {

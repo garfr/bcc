@@ -231,6 +231,8 @@ Token getToken(Lexer *lex) {
                         return makeTokenInplace(lex, TOK_PERIOD);
                     case '&':
                         return makeTokenInplace(lex, TOK_AMPERSAND);
+                    case '@':
+                        return makeTokenInplace(lex, TOK_AT);
                     case '{':
                         return makeTokenInplace(lex, TOK_LBRACKET);
                     case '}':

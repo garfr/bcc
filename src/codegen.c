@@ -138,11 +138,12 @@ bool needsOwnInstruction(Expr *exp) {
         case EXP_VAR:
         case EXP_BOOL:
         case EXP_CHAR:
-        case EXP_ADDROF:
             return false;
         case EXP_BINOP:
         case EXP_FUNCALL:
         case EXP_RECORDLIT:
+        case EXP_ADDROF:
+        case EXP_DEREF:
             return true;
         default:
             printf("ERROR: Unexpected exp enum: %d\n", exp->type);
@@ -294,20 +295,23 @@ char* pickLoadInst(Type* type) {
         case TYP_S32:
             return "loadsw";
         case TYP_U32:
-            return "loaduw";
-        case TYP_S64:
-        case TYP_U64:
-        case TYP_FUN:
-            return "loadl";
         case TYP_BOOL:
         case TYP_CHAR:
             return "loaduw";
+        case TYP_S64:
+        case TYP_U64:
+        case TYP_PTR:
+        case TYP_FUN:
+            return "loadl";
         case TYP_BINDING:
             return pickLoadInst(type->typeEntry->data);
-        default:
-            printf("These types dont work yet.\n");
-            exit(1);
+        case TYP_VOID:
+        case TYP_INTLIT:
+        case TYP_RECORD:
+            assert(false);
+            return NULL;
     }
+    return NULL;
 }
 
 char* pickStoreInst(Type* type) {
@@ -376,6 +380,21 @@ char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
         }
         assert(false); // This will be signalled as an erro in gen_stack.c
         return NULL;
+    }
+    case EXP_DEREF: {
+        char* exp = generateExpr(scope, expr->deref, needsCopy);
+        int loc1 = getNewNum();
+        if (*needsCopy) {
+            fprintf(context.out, "\t%%v%d =l copy %s\n", loc1, exp);
+        }
+        else {
+            fprintf(context.out, "\t%%v%d =l %s\n", loc1, exp);
+        }
+        int loc2 = getNewNum();
+
+        fprintf(context.out, "\t%%v%d =%s %s %%v%d\n", loc2, generateType(expr->deref->typeExpr), pickLoadInst(expr->deref->typeExpr), loc1);
+        *needsCopy = true;
+        return msprintf("%%v%d", loc2);
     }
     case EXP_BINOP: {
         if (expr->binop.op == BINOP_AND) {

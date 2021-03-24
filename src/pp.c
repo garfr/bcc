@@ -11,6 +11,9 @@ void printToken(Token tok) {
         case TOK_LET:
             printf("TOK_LET");
             break;
+        case TOK_AT:
+            printf("TOK_AT");
+            break;
         case TOK_BOOL:
             printf("TOK_BOOL");
             break;
@@ -248,6 +251,10 @@ void printExpr(Expr *exp) {
             break;
         case EXP_ADDROF:
             printf("EXP_ADDROF: ");
+            printExpr(exp->addrOf);
+            break;
+        case EXP_DEREF:
+            printf("EXP_DEREF: ");
             printExpr(exp->addrOf);
             break;
         case EXP_BOOL:

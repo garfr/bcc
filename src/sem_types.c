@@ -281,6 +281,16 @@ void typeExpression(Scope *scope, Expr *exp) {
             exp->typeExpr = newType;
             break;
         }
+        case EXP_DEREF: {
+            typeExpression(scope, exp->deref);
+            if (exp->deref->typeExpr->type != TYP_PTR) {
+                queueError(msprintf("Cannot dereference type '%s'",
+                                    stringOfType(exp->deref->typeExpr)),
+                           exp->start, exp->end);
+            }
+            exp->typeExpr = exp->deref->typeExpr->ptrType;
+            break;
+        }
         case EXP_INT:
             exp->typeExpr = IntegerLit;
             break;

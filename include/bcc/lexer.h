@@ -33,6 +33,7 @@ enum TokenType {
     /* Punctuation */
     TOK_COLON,
     TOK_AMPERSAND,
+    TOK_AT,
     TOK_DOUBLECOLON,
     TOK_SEMICOLON,
     TOK_COMMA,

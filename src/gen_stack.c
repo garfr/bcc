@@ -20,6 +20,9 @@ void checkStackExpr(Scope *scope, Expr *exp) {
             }
             break;
         }
+        case EXP_DEREF:
+            checkStackExpr(scope, exp->deref);
+            break;
         case EXP_FUNCALL: {
             for (size_t i = 0; i < exp->funcall.arguments->numItems; i++) {
                 Expr *tempExp =

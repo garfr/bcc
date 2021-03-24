@@ -54,6 +54,7 @@ typedef struct Expr {
 
     enum ExprType {
         EXP_ADDROF,
+        EXP_DEREF,
         EXP_CHAR,
         EXP_INT,
         EXP_VAR,
@@ -86,6 +87,7 @@ typedef struct Expr {
         } binop;
 
         struct Expr *addrOf;
+        struct Expr *deref;
         struct {
             Vector *arguments;  // Expr*
             Symbol name;        // This is kept so function declarations can be
