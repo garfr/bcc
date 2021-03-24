@@ -102,7 +102,7 @@ static HashEntry *addToScope(Scope *scope, Symbol sym, bool isMut) {
     TypedEntry *entry = calloc(1, sizeof(TypedEntry));
     entry->isMut = isMut;
     entry->type = NULL;
-    entry->onStack = true;
+    entry->onStack = false;
     return insertHashtbl(scope->vars, sym, entry);
 }
 
@@ -130,7 +130,7 @@ int64_t convertSymbolInt(Token tok) {
         printErrors();
     }
 
-    return ret / 8;
+    return ret;
 }
 
 Type *parseType(Parser *parser) {
@@ -772,10 +772,6 @@ Stmt *parseStmt(Parser *parser) {
         Scope* oldScope = parser->currentScope;
 
         pushScope(parser);
-        if (parser->currentScope == NULL) {
-
-            printf("whyu this nukl\n");
-        }
         while (peekToken(parser->lex).type != TOK_END && peekToken(parser->lex).type != TOK_ELSE) {
             Stmt * tempStmt = parseStmt(parser);
             pushVector(block1, &tempStmt);

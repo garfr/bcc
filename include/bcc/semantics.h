@@ -9,4 +9,3 @@ void checkReturns(AST *ast);
 Type *coerceBinop(int op, Type *type1, Type *type2);
 Type *coerceAssignment(Type *type1, Type *type2);
 
-int64_t calculateSize(Type *type);

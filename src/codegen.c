@@ -11,6 +11,50 @@ struct {
     FILE *out;
 } context;
 
+/* Calculates the size of a type in bytes */
+int64_t calculateSize(Type *type) {
+    switch (type->type) {
+        case TYP_S8:
+        case TYP_U8:
+            return 1;
+        case TYP_S16:
+        case TYP_U16:
+            return 2;
+        case TYP_S32:
+        case TYP_BOOL:
+        case TYP_U32:
+        case TYP_CHAR:
+            return 4;
+        case TYP_S64:
+        case TYP_U64:
+            return 8;
+        case TYP_VOID:
+            return 0;
+        case TYP_FUN:
+            return 8;
+        case TYP_INTLIT:
+            printf(
+                "Internal compiler error: Cannot calculate size of integer "
+                "literal,\n");
+            exit(1);
+        case TYP_RECORD: {
+            int64_t size = 0;
+            for (size_t i = 0; i < type->record.vec->numItems; i++) {
+                HashEntry *entry =
+                    *((HashEntry **)indexVector(type->record.vec, i));
+                size += calculateSize((Type *)entry->data);
+            }
+            return size;
+        }
+        case TYP_BINDING:
+            return calculateSize(type->typeEntry->data);
+    }
+    printf(
+        "Internal compiler error: Reached end of calculateSize without "
+        "returning.\n");
+    exit(1);
+}
+
 const char *generateType(Type *type) {
     switch (type->type) {
         case TYP_S8:
@@ -367,7 +411,7 @@ char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
             expr2 = tempExpr2;
         }
         *needsCopy = false;
-        return msprintf("%s %s, %s\n", generateBinaryOp(expr->binop.op, expr->typeExpr), expr1,
+        return msprintf("%s %s, %s", generateBinaryOp(expr->binop.op, expr->typeExpr), expr1,
                         expr2);
     }
 
@@ -441,10 +485,11 @@ static void generateStatement(Scope *scope, Stmt *stmt) {
     case STMT_DEC: {
         TypedEntry* entry = stmt->dec.var->data;
         if (entry->onStack) {
-            fprintf(context.out, "\n%%%.*s =l alloc4 %ld\n", 
+            fprintf(context.out, "\t%%%.*s =l alloc4 %ld\n", 
                     (int) stmt->dec.var->id.len, 
                     stmt->dec.var->id.text, 
                     calculateSize(stmt->dec.type));
+            printType(stmt->dec.type);
         }
         break;
     }
@@ -453,15 +498,29 @@ static void generateStatement(Scope *scope, Stmt *stmt) {
         generateExpr(scope, stmt->singleExpr, &copy);
         break;
     case STMT_ASSIGN: {
+        TypedEntry* entry = stmt->assign.var->data;
         char *expr = generateExpr(scope, stmt->assign.value, &copy);
-        if (copy) {
-            fprintf(context.out, "\t%%%.*s =%s %s\n", (int)stmt->assign.var->id.len,
-                    stmt->assign.var->id.text,
-                    generateType(stmt->assign.value->typeExpr), expr);
-        } else {
-            fprintf(context.out, "\t%%%.*s =%s copy %s\n",
-                    (int)stmt->assign.var->id.len, stmt->assign.var->id.text,
-                    generateType(stmt->assign.value->typeExpr), expr);
+        int loc = getNewNum();
+        if (entry->onStack) {
+            if (copy) {
+                fprintf(context.out, "\t%%v%d =%s copy %s\n", loc, generateType(stmt->assign.value->typeExpr), expr);
+            }
+            else {
+                fprintf(context.out, "\t%%v%d =%s %s\n", loc, generateType(stmt->assign.value->typeExpr), expr);
+            }
+            fprintf(context.out, "\t%s %%v%d, %%%.*s\n", pickStoreInst(stmt->assign.value->typeExpr), loc, 
+                    (int) stmt->assign.var->id.len, stmt->assign.var->id.text);
+        }
+        else {
+            if (copy) {
+                fprintf(context.out, "\t%%%.*s =%s copy %s\n", (int)stmt->assign.var->id.len,
+                        stmt->assign.var->id.text,
+                        generateType(stmt->assign.value->typeExpr), expr);
+            } else {
+                fprintf(context.out, "\t%%%.*s =%s %s\n",
+                        (int)stmt->assign.var->id.len, stmt->assign.var->id.text,
+                        generateType(stmt->assign.value->typeExpr), expr);
+            }
         }
         break;
     }

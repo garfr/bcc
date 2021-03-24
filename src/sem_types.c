@@ -4,6 +4,7 @@
 
 // clang-format off
 #include "bcc/ast.h"
+#include "bcc/pp.h"
 #include "bcc/error.h"
 #include "bcc/utils.h"
 #include "bcc/semantics.h"
@@ -343,51 +344,6 @@ void typeExpression(Scope *scope, Expr *exp) {
             exp->typeExpr->typeEntry = exp->reclit.type;
         }
     }
-}
-
-/* Calculates the size of a type in bytes */
-int64_t calculateSize(Type *type) {
-    switch (type->type) {
-        case TYP_S8:
-        case TYP_U8:
-        case TYP_CHAR:
-            return 1;
-        case TYP_S16:
-        case TYP_U16:
-            return 2;
-        case TYP_S32:
-        case TYP_U32:
-            return 4;
-        case TYP_S64:
-        case TYP_U64:
-            return 8;
-        case TYP_VOID:
-            return 0;
-        case TYP_FUN:
-            return 8;
-        case TYP_INTLIT:
-            printf(
-                "Internal compiler error: Cannot calculate size of integer "
-                "literal,\n");
-            exit(1);
-        case TYP_RECORD: {
-            int64_t size = 0;
-            for (size_t i = 0; i < type->record.vec->numItems; i++) {
-                HashEntry *entry =
-                    *((HashEntry **)indexVector(type->record.vec, i));
-                size += calculateSize((Type *)entry->data);
-            }
-            return size;
-        }
-        case TYP_BINDING:
-            return calculateSize(type->typeEntry->data);
-        case TYP_BOOL:
-            return 1;
-    }
-    printf(
-        "Internal compiler error: Reached end of calculateSize without "
-        "returning.\n");
-    exit(1);
 }
 
 /* Adds type information to a statment, including inserting any needed
