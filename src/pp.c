@@ -171,6 +171,10 @@ void printType(Type *type) {
         case TYP_VOID:
             printf("void");
             break;
+        case TYP_PTR:
+            printf("&");
+            printType(type->ptrType);
+            break;
         case TYP_INTLIT:
             printf("TYP_INTLIT");
             break;
@@ -241,6 +245,10 @@ void printExpr(Expr *exp) {
             break;
         case EXP_VAR:
             printf("EXP_VAR: '%.*s'", (int)exp->var->id.len, exp->var->id.text);
+            break;
+        case EXP_ADDROF:
+            printf("EXP_ADDROF: ");
+            printExpr(exp->addrOf);
             break;
         case EXP_BOOL:
             printf("EXP_BOOL: %s", exp->boolean ? "true" : "false");

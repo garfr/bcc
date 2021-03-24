@@ -137,15 +137,15 @@ Type *parseType(Parser *parser) {
     Type *ret;
 
     Token tok = nextToken(parser->lex);
-    if (tok.type != TOK_SYM && tok.type != TOK_VOID && tok.type != TOK_BOOL &&
-        tok.type != TOK_LPAREN && tok.type != TOK_CHAR) {
-        queueError(msprintf("Unexpected token, expected type to be a "
-                            "single symbol, arrays "
-                            "and pointers are not supported"),
-                   tok.start, tok.end);
-        tok = continueUntil(parser->lex, TOK_SYM_BITS);
-    }
+
     switch (tok.type) {
+    case TOK_AMPERSAND: {
+        Type* nextType = parseType(parser);
+        Type* ret = calloc(1, sizeof(Type));
+        ret->type = TYP_PTR;
+        ret->ptrType = nextType;
+        return ret;
+    }
     case TOK_SYM:
         switch (tok.sym.text[0]) {
         case 's':
@@ -229,7 +229,8 @@ Type *parseType(Parser *parser) {
     }
 
     default:
-        assert(false);
+        queueError("This token cannot start a type", tok.start, tok.end);
+        printErrors();
         return NULL;
     }
 }
@@ -466,13 +467,26 @@ int parseBinop(Parser *parser) {
     }
 }
 
+Expr *parseUnary(Parser *parser) {
+    if (peekToken(parser->lex).type == TOK_AMPERSAND) {
+        nextToken(parser->lex);
+        Expr *right  = parseUnary(parser);
+        Expr *ret = calloc(1, sizeof(Expr));
+        ret->type = EXP_ADDROF;
+        ret->addrOf = right;
+        return ret;
+    }
+
+    return parsePrimary(parser);
+}
+
 Expr *parseFactor(Parser *parser) {
-    Expr *exp = parsePrimary(parser);
+    Expr *exp = parseUnary(parser);
 
     while (peekToken(parser->lex).type == TOK_STAR ||
            peekToken(parser->lex).type == TOK_SLASH) {
         int op = parseBinop(parser);
-        Expr *right = parsePrimary(parser);
+        Expr *right = parseUnary(parser);
         Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
         newExpr->binop.exp1 = exp;
         newExpr->binop.exp2 = right;

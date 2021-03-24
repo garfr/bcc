@@ -4,7 +4,7 @@
 
 #include "bcc/ast.h"
 
-void calculateStackPositions(AST *ast);
+void allocateToStack(AST *ast);
 
 void generateCode(AST *ast, FILE *file);
 

@@ -48,6 +48,8 @@ char *stringOfType(Type *type) {
             return "void";
         case TYP_BOOL:
             return "bool";
+        case TYP_PTR:
+            return msprintf("&%s", stringOfType(type->ptrType));
         case TYP_BINDING:
             return msprintf("%.*s", (int)type->typeEntry->id.len,
                             type->typeEntry->id.text);
@@ -263,6 +265,12 @@ void typeExpression(Scope *scope, Expr *exp) {
                 }
             }
         } break;
+        case EXP_ADDROF:
+            typeExpression(scope, exp->addrOf);
+            exp->typeExpr = calloc(1, sizeof(Type));
+            exp->typeExpr->type = TYP_PTR;
+            exp->typeExpr->ptrType = exp->typeExpr;
+            break;
         case EXP_INT:
             exp->typeExpr = IntegerLit;
             break;

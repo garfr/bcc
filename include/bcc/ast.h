@@ -24,6 +24,7 @@ typedef struct Type {
         TYP_INTLIT,
         TYP_FUN,
         TYP_BOOL,
+        TYP_PTR,
         // A binding of a more complex type to a single name
         TYP_BINDING,
     } type;
@@ -38,6 +39,8 @@ typedef struct Type {
             Hashtbl *recordFields;  // RecordField
             Vector *vec;  // A linear list of HashEntries, that represents the
         } record;
+
+        struct Type *ptrType;
     };
 } Type;
 
@@ -50,6 +53,7 @@ typedef struct Expr {
     size_t end;
 
     enum ExprType {
+        EXP_ADDROF,
         EXP_CHAR,
         EXP_INT,
         EXP_VAR,
@@ -81,6 +85,7 @@ typedef struct Expr {
             } op;
         } binop;
 
+        struct Expr *addrOf;
         struct {
             Vector *arguments;  // Expr*
             Symbol name;        // This is kept so function declarations can be

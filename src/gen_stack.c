@@ -1,5 +1,6 @@
 #include "bcc/ast.h"
 #include "bcc/codegen.h"
+#include "bcc/error.h"
 
 /* First a pass is made through the the AST to determine what variables need to
  * be on the stack Then a pass is made to calculate the position on the stack of
@@ -7,6 +8,18 @@
  */
 void checkStackExpr(Scope *scope, Expr *exp) {
     switch (exp->type) {
+        case EXP_ADDROF: {
+            if (exp->addrOf->type == EXP_VAR) {
+                ((TypedEntry *)exp->addrOf->var->data)->onStack = true;
+            } else {
+                queueError(
+                    "Can only take the address of variables, indexes, and "
+                    "struct fields",
+                    exp->start, exp->end);
+                checkStackExpr(scope, exp->addrOf);
+            }
+            break;
+        }
         case EXP_FUNCALL: {
             for (size_t i = 0; i < exp->funcall.arguments->numItems; i++) {
                 Expr *tempExp =
@@ -23,6 +36,7 @@ void checkStackExpr(Scope *scope, Expr *exp) {
         case EXP_BOOL:
         case EXP_VAR:
         case EXP_CHAR:
+            break;
         case EXP_RECORDLIT: {
             for (size_t i = 0; i < exp->reclit.fields->numBuckets; i++) {
                 for (HashEntry *entry = exp->reclit.fields->buckets[i];
@@ -79,7 +93,7 @@ void checkStackStmt(Scope *scope, Stmt *stmt) {
     }
 }
 
-void stackAST(AST *ast) {
+void allocateToStack(AST *ast) {
     for (size_t i = 0; i < ast->decs->numItems; i++) {
         Toplevel toplevel = *((Toplevel *)indexVector(ast->decs, i));
         switch (toplevel.type) {

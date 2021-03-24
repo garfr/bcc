@@ -1,11 +1,13 @@
-#include "bcc/codegen.h"
-
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+// clang-format off
+#include "bcc/codegen.h"
 #include "bcc/pp.h"
 #include "bcc/semantics.h"
 #include "bcc/utils.h"
+// clang-format on
 
 struct {
     FILE *out;
@@ -27,6 +29,7 @@ int64_t calculateSize(Type *type) {
             return 4;
         case TYP_S64:
         case TYP_U64:
+        case TYP_PTR:
             return 8;
         case TYP_VOID:
             return 0;
@@ -69,6 +72,7 @@ const char *generateType(Type *type) {
             return "w";
         case TYP_S64:
         case TYP_U64:
+        case TYP_PTR:
         case TYP_FUN:
 
             return "l";
@@ -115,6 +119,7 @@ char *generateBinaryOp(int op, Type *type) {
                 case TYP_U64:
                 case TYP_FUN:
                 case TYP_RECORD:
+                case TYP_PTR:
                     return "ceql";
                 case TYP_BINDING:
                     return generateBinaryOp(op, type->typeEntry->data);
@@ -133,6 +138,7 @@ bool needsOwnInstruction(Expr *exp) {
         case EXP_VAR:
         case EXP_BOOL:
         case EXP_CHAR:
+        case EXP_ADDROF:
             return false;
         case EXP_BINOP:
         case EXP_FUNCALL:
@@ -363,6 +369,14 @@ char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
     case EXP_CHAR:
         *needsCopy = true;
         return msprintf("%d", translateCharacter(expr->character));
+    case EXP_ADDROF:  {
+        if (expr->addrOf->type == EXP_VAR) {
+            *needsCopy = true;
+            return msprintf("%%%.*s", (int) expr->addrOf->var->id.len, expr->addrOf->var->id.text);
+        }
+        assert(false); // This will be signalled as an erro in gen_stack.c
+        return NULL;
+    }
     case EXP_BINOP: {
         if (expr->binop.op == BINOP_AND) {
             return generateAnd(scope, expr, needsCopy);
@@ -669,7 +683,9 @@ static void generateToplevel(Toplevel top) {
 }
 
 void generateCode(AST *ast, FILE *file) {
+    allocateToStack(ast);
     context.out = file;
+
     for (size_t i = 0; i < ast->decs->numItems; i++) {
 
         Toplevel top = *((Toplevel *)indexVector(ast->decs, i));

@@ -33,6 +33,8 @@ void resolveExpr(Scope *scope, Expr *exp) {
         resolveExpr(scope, exp->binop.exp1);
         resolveExpr(scope, exp->binop.exp2);
         break;
+    case EXP_ADDROF:
+        resolveExpr(scope, exp->addrOf);
     case EXP_INT:
     case EXP_BOOL:
     case EXP_VAR:
