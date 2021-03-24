@@ -229,6 +229,8 @@ Token getToken(Lexer *lex) {
                         return makeTokenInplace(lex, TOK_COMMA);
                     case '.':
                         return makeTokenInplace(lex, TOK_PERIOD);
+                    case '&':
+                        return makeTokenInplace(lex, TOK_AMPERSAND);
                     case '{':
                         return makeTokenInplace(lex, TOK_LBRACKET);
                     case '}':
