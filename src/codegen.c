@@ -539,28 +539,59 @@ static void generateStatement(Scope *scope, Stmt *stmt) {
         generateExpr(scope, stmt->singleExpr, &copy);
         break;
     case STMT_ASSIGN: {
-        TypedEntry* entry = stmt->assign.var->data;
-        char *expr = generateExpr(scope, stmt->assign.value, &copy);
-        int loc = getNewNum();
-        if (entry->onStack) {
-            if (copy) {
-                fprintf(context.out, "\t%%v%d =%s copy %s\n", loc, generateType(stmt->assign.value->typeExpr), expr);
+        if (stmt->assign.lval->type == LVAL_VAR) {
+            TypedEntry* entry = stmt->assign.lval->var.entry->data;
+            char *expr = generateExpr(scope, stmt->assign.value, &copy);
+            int loc = getNewNum();
+            if (entry->onStack) {
+                if (copy) {
+                    fprintf(context.out, "\t%%v%d =%s copy %s\n", loc, generateType(stmt->assign.value->typeExpr), expr);
+                }
+                else {
+                    fprintf(context.out, "\t%%v%d =%s %s\n", loc, generateType(stmt->assign.value->typeExpr), expr);
+                }
+                fprintf(context.out, "\t%s %%v%d, %%%.*s\n", pickStoreInst(stmt->assign.value->typeExpr), loc, 
+                        (int) stmt->assign.lval->var.entry->id.len, stmt->assign.lval->var.entry->id.text);
             }
             else {
-                fprintf(context.out, "\t%%v%d =%s %s\n", loc, generateType(stmt->assign.value->typeExpr), expr);
+                if (copy) {
+                    fprintf(context.out, "\t%%%.*s =%s copy %s\n", (int)stmt->assign.lval->var.entry->id.len,
+                            stmt->assign.lval->var.entry->id.text,
+                            generateType(stmt->assign.value->typeExpr), expr);
+                } else {
+                    fprintf(context.out, "\t%%%.*s =%s %s\n",
+                            (int)stmt->assign.lval->var.entry->id.len, stmt->assign.lval->var.entry->id.text,
+                            generateType(stmt->assign.value->typeExpr), expr);
+                }
             }
-            fprintf(context.out, "\t%s %%v%d, %%%.*s\n", pickStoreInst(stmt->assign.value->typeExpr), loc, 
-                    (int) stmt->assign.var->id.len, stmt->assign.var->id.text);
         }
-        else {
-            if (copy) {
-                fprintf(context.out, "\t%%%.*s =%s copy %s\n", (int)stmt->assign.var->id.len,
-                        stmt->assign.var->id.text,
-                        generateType(stmt->assign.value->typeExpr), expr);
-            } else {
-                fprintf(context.out, "\t%%%.*s =%s %s\n",
-                        (int)stmt->assign.var->id.len, stmt->assign.var->id.text,
-                        generateType(stmt->assign.value->typeExpr), expr);
+        if (stmt->assign.lval->type == LVAL_DEREF) {
+            TypedEntry* entry = stmt->assign.lval->deref.entry->data;
+            char *expr = generateExpr(scope, stmt->assign.value, &copy);
+            if (entry->onStack) {
+                int loc = getNewNum(); // Stores the actual address of the variable, not the address of the address on the stack 
+                fprintf(context.out, "\t%%v%d =l loadl %%%.*s\n", loc, (int) stmt->assign.lval->deref.sym.len, stmt->assign.lval->deref.sym.text);
+                
+                int loc2 = getNewNum();
+                if (copy) {
+                    fprintf(context.out, "\t%%v%d =%s copy %s\n", loc2, generateType(stmt->assign.value->typeExpr), expr);
+                }
+                else {
+                    fprintf(context.out, "\t%%v%d =%s %s\n", loc2, generateType(stmt->assign.value->typeExpr), expr);
+                }
+                fprintf(context.out, "\t%s %%v%d, %%v%d\n", pickStoreInst(stmt->assign.value->typeExpr), loc2, loc);
+            }
+            else {
+
+                int loc = getNewNum();
+                if (copy) {
+                    fprintf(context.out, "\t%%v%d =%s copy %s\n", loc, generateType(stmt->assign.value->typeExpr), expr);
+                }
+                else {
+                    fprintf(context.out, "\t%%v%d =%s %s\n", loc, generateType(stmt->assign.value->typeExpr), expr);
+                }
+
+                fprintf(context.out, "\t%s %%v%d, %%%.*s\n", pickStoreInst(stmt->assign.value->typeExpr), loc, (int) stmt->assign.lval->deref.sym.len, stmt->assign.lval->deref.sym.text);
             }
         }
         break;
@@ -650,12 +681,12 @@ static void generateStatement(Scope *scope, Stmt *stmt) {
             if (copy) {
                 fprintf(context.out, "\t%%%.*s =%s copy %s\n",
                         (int)stmt->dec_assign.var->id.len,
-                        stmt->assign.var->id.text,
+                        stmt->dec_assign.var->id.text,
                         generateType(stmt->dec_assign.value->typeExpr), expr);
             } else {
                 fprintf(context.out, "\t%%%.*s =%s %s\n",
                         (int)stmt->dec_assign.var->id.len,
-                        stmt->assign.var->id.text,
+                        stmt->dec_assign.var->id.text,
                         generateType(stmt->dec_assign.value->typeExpr), expr);
             }
         }

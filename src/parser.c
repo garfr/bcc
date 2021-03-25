@@ -682,7 +682,63 @@ Stmt *parseInferredDec(Parser *parser, Token varTok, bool isMut) {
     return stmt;
 }
 
-Stmt *parseAssignment(Parser *parser, Token symTok) {
+Symbol getSymbolLVal(LVal* lval) {
+
+    if (lval->type == LVAL_VAR) {
+        return lval->var.sym;
+    }
+    else if (lval->type == LVAL_DEREF) {
+        return lval->deref.sym;
+    }
+    else {
+        assert(false);
+        exit(1);
+    }
+}
+
+LVal* parseLVal(Parser *parser) {
+
+    Token tok = nextToken(parser->lex);
+    switch(tok.type) {
+        case TOK_AT: {
+            Token tok2 = nextToken(parser->lex);
+            if (tok2.type != TOK_SYM) {
+                queueError("Expected symbol after dereference in l-value\n", tok2.start, tok2.end);
+                printErrors();
+            }
+            LVal* new = calloc(1, sizeof(LVal));
+            new->type = LVAL_DEREF;
+            new->deref.sym = tok2.sym;
+
+            new->deref.entry = NULL;
+            new->start = tok.start;
+            new->end = tok2.start;
+            return new;
+        }
+        case TOK_SYM: {
+            LVal* new = calloc(1, sizeof(LVal));
+            new->type = LVAL_VAR;
+            new->var.sym = tok.sym;
+            new->var.entry = NULL;
+            new->start = tok.start;
+            new->end = tok.start;
+            return new;
+        }
+        default:
+            queueError("Expected '@' or name for left hand side of assignment", tok.start, tok.end);
+            printErrors();
+            exit(1);
+    }
+}
+
+Stmt *parseAssignment(Parser *parser) {
+    LVal * lval = parseLVal(parser);
+
+    Token equalTok = nextToken(parser->lex);
+    if (equalTok.type != TOK_EQUAL) {
+        queueError("Expected '=' after l-value in assignment", equalTok.start, equalTok.end);
+    }
+
     Expr *value = parseExpr(parser);
 
     Token semiTok = nextToken(parser->lex);
@@ -692,18 +748,31 @@ Stmt *parseAssignment(Parser *parser, Token symTok) {
             semiTok.start, semiTok.end);
         printErrors();
     }
-    Stmt *ret = stmtFromTwoPoints(symTok.start, semiTok.end, STMT_ASSIGN);
+    Stmt *ret = stmtFromTwoPoints(lval->start, semiTok.end, STMT_ASSIGN);
 
-    HashEntry *entry = findInScope(parser->currentScope, symTok.sym);
+
+    HashEntry *entry = findInScope(parser->currentScope, getSymbolLVal(lval));
 
     if (entry == NULL) {
         queueError(msprintf("Cannot find variable: '%.*s' in scope",
-                            symTok.sym.len, (char *)symTok.sym.text),
+                            getSymbolLVal(lval).len, (char *)getSymbolLVal(lval).text),
                    ret->start, ret->end);
         printErrors();
     }
 
-    ret->assign.var = entry;
+
+    if (lval->type == LVAL_VAR){ 
+        lval->var.entry = entry;
+    }
+    else if (lval->type == LVAL_DEREF){ 
+        lval->deref.entry = entry;
+    }
+    else {
+        assert(false);
+        exit(1);
+    }
+
+    ret->assign.lval = lval;
     ret->assign.value = value;
     return ret;
 }
@@ -751,13 +820,13 @@ Stmt *parseStmt(Parser *parser) {
     case TOK_RETURN:
         nextToken(parser->lex);
         return parseReturn(parser, tok);
+    case TOK_AT:
+        return parseAssignment(parser);
     case TOK_SYM: {
         Token equalsTok = lookaheadToken(parser->lex);
         switch (equalsTok.type) {
         case TOK_EQUAL:
-            nextToken(parser->lex);
-            nextToken(parser->lex);
-            return parseAssignment(parser, tok);
+            return parseAssignment(parser);
         case TOK_COLON:
             nextToken(parser->lex);
             nextToken(parser->lex);

@@ -102,6 +102,29 @@ typedef struct Expr {
     };
 } Expr;
 
+/* Left hand side of an assignment */
+typedef struct LVal {
+    enum LValType {
+        LVAL_DEREF,
+        LVAL_VAR,
+    } type;
+
+    union {
+        struct {
+            Symbol sym;
+            HashEntry *entry;
+        } deref;
+
+        struct {
+            Symbol sym;
+            HashEntry *entry;
+        } var;
+    };
+
+    size_t start;
+    size_t end;
+} LVal;
+
 /* A variant enum representing a single statment in the AST */
 typedef struct Stmt {
     size_t start;
@@ -144,7 +167,7 @@ typedef struct Stmt {
         } dec_assign;
 
         struct {
-            HashEntry *var;
+            LVal *lval;
             Expr *value;
         } assign;
 

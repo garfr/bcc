@@ -290,6 +290,17 @@ void printExpr(Expr *exp) {
     printf(" %zd-%zd", exp->start, exp->end);
 }
 
+void printLVal(LVal *lval) {
+    switch (lval->type) {
+        case LVAL_VAR:
+            printf("%.*s", (int)lval->var.sym.len, lval->var.sym.text);
+            break;
+        case LVAL_DEREF:
+            printf("@%.*s", (int)lval->deref.sym.len, lval->deref.sym.text);
+            break;
+    }
+}
+
 void printStmt(Stmt *stmt) {
     switch (stmt->type) {
         case STMT_DEC:
@@ -319,8 +330,9 @@ void printStmt(Stmt *stmt) {
             printf(")");
             break;
         case STMT_ASSIGN:
-            printf("STMT_ASSIGN: '%.*s' = (", (int)stmt->assign.var->id.len,
-                   stmt->assign.var->id.text);
+            printf("STMT_ASSIGN: ");
+            printLVal(stmt->assign.lval);
+            printf(" = ");
             printExpr(stmt->assign.value);
             printf(")");
             break;

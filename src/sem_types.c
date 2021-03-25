@@ -376,6 +376,29 @@ void typeExpression(Scope *scope, Expr *exp) {
     }
 }
 
+/* Returns the place in the symbol table */
+TypedEntry *getLValEntry(LVal *lval) {
+    switch (lval->type) {
+        case LVAL_VAR:
+            return lval->var.entry->data;
+        case LVAL_DEREF:
+            return lval->deref.entry->data;
+    }
+    assert(false);
+    exit(1);
+}
+/* Returns the place in the symbol table */
+Symbol getLValSym(LVal *lval) {
+    switch (lval->type) {
+        case LVAL_VAR:
+            return lval->var.sym;
+        case LVAL_DEREF:
+            return lval->deref.sym;
+    }
+    assert(false);
+    exit(1);
+}
+
 /* Adds type information to a statment, including inserting any needed
  * information into the symbol table */
 void typeStmt(Scope *scope, Stmt *stmt) {
@@ -479,21 +502,31 @@ void typeStmt(Scope *scope, Stmt *stmt) {
         case STMT_ASSIGN: {
             typeExpression(scope, stmt->assign.value);
 
-            assert(stmt->assign.var->data != NULL);
+            TypedEntry *entry = getLValEntry(stmt->assign.lval);
 
-            TypedEntry *entry = (TypedEntry *)stmt->assign.var->data;
+            Type *type;
 
-            if (!entry->isMut) {
-                queueError(
-                    msprintf("Cannot assign to immutable variable '%.*s'",
-                             stmt->assign.var->id.len,
-                             stmt->assign.var->id.text),
-                    stmt->start, stmt->end);
-                return;
+            if (stmt->assign.lval->type == LVAL_VAR) {
+                type =
+                    coerceAssignment(entry->type, stmt->assign.value->typeExpr);
+                if (!entry->isMut) {
+                    queueError(
+                        msprintf("Cannot assign to immutable variable '%.*s'",
+                                 (int)getLValSym(stmt->assign.lval).len,
+                                 getLValSym(stmt->assign.lval).text),
+                        stmt->start, stmt->end);
+                    return;
+                }
+            } else if (stmt->assign.lval->type == LVAL_DEREF) {
+                if (entry->type->type != TYP_PTR) {
+                    queueError(
+                        "Cannot assign to address of non-pointer variable",
+                        stmt->start, stmt->end);
+                    printErrors();
+                }
+                type = coerceAssignment(entry->type->ptrType,
+                                        stmt->assign.value->typeExpr);
             }
-
-            Type *type =
-                coerceAssignment(entry->type, stmt->assign.value->typeExpr);
 
             if (type == NULL) {
                 queueError(msprintf("Cannot coerce type %s to %s",
