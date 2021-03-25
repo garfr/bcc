@@ -31,7 +31,6 @@ static Token makeTokenInplace(Lexer *lex, enum TokenType type) {
 static Token makeTokenBehind(Lexer *lex, enum TokenType type) {
     Token tok = (Token){
         .start = lex->startIdx, .end = lex->endIdx - 1, .type = type, {}};
-    lex->endIdx++;
     lex->startIdx = lex->endIdx;
     lex->state = LEX_START;
     return tok;
