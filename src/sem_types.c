@@ -526,6 +526,9 @@ void typeStmt(Scope *scope, Stmt *stmt) {
                 }
                 type = coerceAssignment(entry->type->ptrType,
                                         stmt->assign.value->typeExpr);
+            } else {
+                assert(false);
+                exit(1);
             }
 
             if (type == NULL) {

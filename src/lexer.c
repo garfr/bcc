@@ -253,6 +253,11 @@ Token getToken(Lexer *lex) {
                     return makeTokenBehind(lex, TOK_MINUS);
                 }
                 unsigned char c = lex->buffer[lex->endIdx];
+                if (isdigit(c)) {
+                    lex->endIdx++;
+                    lex->state = LEX_INT;
+                    continue;
+                }
                 if (c == '>') {
                     return makeTokenInplace(lex, TOK_ARROW);
                 }
