@@ -38,7 +38,7 @@ enum TokTypeBits {
     TOK_LPAREN_BITS = 1 << 7,
     TOK_RETURN_BITS = 1 << 8,
     TOK_PERIOD_BITS = 1 << 9,
-    TOK_THEN_BITS = 1 << 10,
+    TOK_DO_BITS = 1 << 10,
 };
 
 /* Runs through tokens until a token passed in bitflags is reached, which is
@@ -55,7 +55,12 @@ Token continueUntil(Lexer *lex, int bitFlags) {
             (tok.type == TOK_INT && bitFlags & TOK_INT_BITS) ||
             (tok.type == TOK_SEMICOLON && bitFlags & TOK_SEMICOLON_BITS) ||
             (tok.type == TOK_COLON && bitFlags & TOK_COLON_BITS) ||
-            (tok.type == TOK_EQUAL && bitFlags & TOK_EQUAL_BITS)) {
+            (tok.type == TOK_LET && bitFlags & TOK_LET_BITS) ||
+            (tok.type == TOK_ARROW && bitFlags & TOK_ARROW_BITS) ||
+            (tok.type == TOK_LPAREN && bitFlags & TOK_LPAREN_BITS) ||
+            (tok.type == TOK_PERIOD && bitFlags & TOK_PERIOD_BITS) ||
+            (tok.type == TOK_DO && bitFlags & TOK_DO_BITS) ||
+            (tok.type == TOK_RETURN && bitFlags & TOK_RETURN_BITS)) {
             break;
         } else {
             nextToken(lex);
@@ -828,6 +833,104 @@ Stmt *parseReturn(Parser *parser, Token firstTok) {
     return stmt;
 }
 
+Stmt* parseStmt(Parser *parser); // Forward declare this for mutal recursion
+
+Stmt *parseWhile(Parser* parser) {
+    Expr *cond = parseExpr(parser);
+
+    Token doTok = nextToken(parser->lex);
+    if (doTok.type != TOK_DO) {
+        queueError("Expected keyword 'do' after expression", doTok.start, doTok.end);
+        doTok = continueUntil(parser->lex, TOK_DO_BITS);
+    }
+    Vector *block = newVector(sizeof(Stmt*), 0);
+
+    Scope *oldScope = parser->currentScope;
+
+    pushScope(parser);
+
+    while (peekToken(parser->lex).type != TOK_END) {
+        Stmt* tempStmt = parseStmt(parser);
+        pushVector(block, &tempStmt);
+    }
+
+    nextToken(parser->lex);
+
+    Scope *newScope = parser->currentScope;
+
+    parser->currentScope = oldScope;
+
+    Stmt* ret = calloc(1, sizeof(Stmt));
+    ret->type = STMT_WHILE;
+    ret->while_block.block = block;
+    ret->while_block.cond = cond;
+    ret->while_block.scope = newScope;
+
+    return ret;
+
+}
+
+Stmt *parseIf(Parser* parser) {
+    Expr* cond = parseExpr(parser);
+
+    Token thenTok = nextToken(parser->lex);
+    if (thenTok.type != TOK_DO) {
+        queueError("Expected keyword 'do' after expression", thenTok.start, thenTok.end);
+        thenTok = continueUntil(parser->lex, TOK_DO_BITS);
+    }
+
+    Vector * block1 = newVector(sizeof(Stmt*), 0);
+
+    Scope* oldScope = parser->currentScope;
+
+    pushScope(parser);
+    while (peekToken(parser->lex).type != TOK_END && peekToken(parser->lex).type != TOK_ELSE) {
+        Stmt * tempStmt = parseStmt(parser);
+        pushVector(block1, &tempStmt);
+    }
+
+    Scope* scope1 = parser->currentScope;
+    parser->currentScope = oldScope;
+
+    Token elseEndTok = nextToken(parser->lex);
+    if (elseEndTok.type == TOK_END) {
+        Stmt* ret = calloc(1, sizeof(Stmt));
+        ret->type = STMT_IF;
+        ret->if_block.block = block1;
+        ret->if_block.cond = cond ;
+        ret->if_block.scope = scope1;
+        return ret;
+    }
+
+    if (elseEndTok.type == TOK_ELSE) {
+        Vector* block2 = newVector(sizeof(Stmt*), 0);
+
+        oldScope = parser->currentScope;
+
+        pushScope(parser);
+        while (peekToken(parser->lex).type != TOK_END) {
+            Stmt * tempStmt = parseStmt(parser);
+            pushVector(block2, &tempStmt);
+        }
+
+        Scope* scope2 = parser->currentScope;
+        parser->currentScope = oldScope;
+
+        // Skip the end token
+        nextToken(parser->lex);
+
+        Stmt* ret = calloc(1, sizeof(Stmt));
+        ret->type = STMT_IF_ELSE;
+        ret->if_else.block1 = block1;
+        ret->if_else.block2 = block2;
+        ret->if_else.cond = cond;
+        ret->if_else.scope1 = scope1;
+        ret->if_else.scope2 = scope2;
+        return ret;
+    }
+    return NULL;
+}
+
 Stmt *parseStmt(Parser *parser) {
     Token tok = peekToken(parser->lex);
 
@@ -891,64 +994,11 @@ Stmt *parseStmt(Parser *parser) {
     }
     case TOK_IF: {
         nextToken(parser->lex);
-        Expr* cond = parseExpr(parser);
-
-        Token thenTok = nextToken(parser->lex);
-        if (thenTok.type != TOK_DO) {
-            queueError("Expected keyword 'do' after expression", thenTok.start, thenTok.end);
-            thenTok = continueUntil(parser->lex, TOK_THEN_BITS);
-        }
-
-        Vector * block1 = newVector(sizeof(Stmt*), 0);
-
-        Scope* oldScope = parser->currentScope;
-
-        pushScope(parser);
-        while (peekToken(parser->lex).type != TOK_END && peekToken(parser->lex).type != TOK_ELSE) {
-            Stmt * tempStmt = parseStmt(parser);
-            pushVector(block1, &tempStmt);
-        }
-
-        Scope* scope1 = parser->currentScope;
-        parser->currentScope = oldScope;
-
-        Token elseEndTok = nextToken(parser->lex);
-        if (elseEndTok.type == TOK_END) {
-            Stmt* ret = calloc(1, sizeof(Stmt));
-            ret->type = STMT_IF;
-            ret->if_block.block = block1;
-            ret->if_block.cond = cond ;
-            ret->if_block.scope = scope1;
-            return ret;
-        }
-
-        if (elseEndTok.type == TOK_ELSE) {
-            Vector* block2 = newVector(sizeof(Stmt*), 0);
-
-            oldScope = parser->currentScope;
-
-            pushScope(parser);
-            while (peekToken(parser->lex).type != TOK_END) {
-                Stmt * tempStmt = parseStmt(parser);
-                pushVector(block2, &tempStmt);
-            }
-
-            Scope* scope2 = parser->currentScope;
-            parser->currentScope = oldScope;
-
-            // Skip the end token
-            nextToken(parser->lex);
-
-            Stmt* ret = calloc(1, sizeof(Stmt));
-            ret->type = STMT_IF_ELSE;
-            ret->if_else.block1 = block1;
-            ret->if_else.block2 = block2;
-            ret->if_else.cond = cond;
-            ret->if_else.scope1 = scope1;
-            ret->if_else.scope2 = scope2;
-            return ret;
-        }
-        return NULL;
+        return parseIf(parser);
+    }
+    case TOK_WHILE: {
+        nextToken(parser->lex);
+        return parseWhile(parser);
     }
                    
     default: {

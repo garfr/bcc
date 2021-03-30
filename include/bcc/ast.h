@@ -143,6 +143,7 @@ typedef struct Stmt {
         STMT_ASSIGN,
         STMT_RETURN,
         STMT_EXPR,
+        STMT_WHILE,
         STMT_IF,
         STMT_IF_ELSE,
     } type;
@@ -168,7 +169,7 @@ typedef struct Stmt {
         } if_else;
 
         struct {
-            Scope *scope1;
+            Scope *scope;
             Vector *block;  // Stmt*
             Expr *cond;
         } while_block;
