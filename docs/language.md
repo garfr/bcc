@@ -14,7 +14,6 @@ end
 
 The return type can also be inferred as void if it is omitted.
 
-
 A statement can be one of many forms, so instead of naming them all, I will just give examples.
 
 ## Statement Examples
@@ -25,6 +24,7 @@ Declaration:
 ```c
 myVar : s32 
 ```
+
 
 This declares a signed, 32 bit integer variable called myVar.
 
@@ -43,6 +43,8 @@ myVar := otherVar
 This declares a variable myVar and initizalizes it with an other variable.  The type given is the type of otherVar.
 
 (NOTE: The type of a variable cannot be inferred if the expression given is only integer literals.  This ensure that programmers consider what integer size they want)
+
+These three declarations all declare immutable variables.  If you wish to have a variable be mutable, prefix any of them with the ``mut``keyword.
 
 ```c
 myVar = 15
@@ -110,6 +112,32 @@ else
     doOtherThing()
 end
 ```
+## References
+
+Beans allows non-nullable pointers known as "references".  You can take a reference to a variable by putting ``&`` or ``&mut`` before the variables name.  You may only take a mutable reference to a variable if the variable itself is mutable.
+
+Examples:
+``
+myVar := 'a'
+
+constPtr := &myVar
+
+mutPtr := &mut myVar
+``
+
+You can fetch the value that is referenced with both a mutable and immutable variable, using ``@``.  You can assign to a mutable reference by prefixing the assignment with ``@``.
+
+Examples:
+
+``
+myVar := 'a'
+
+myPtr := &mut myVar
+
+putchar(@myPtr)
+
+@myPtr = 'b'
+``
 
 ## External Declarations
 
