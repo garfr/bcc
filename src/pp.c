@@ -32,6 +32,9 @@ void printToken(Token tok) {
         case TOK_OR:
             printf("TOK_OR");
             break;
+        case TOK_WHILE:
+            printf("TOK_WHILE");
+            break;
         case TOK_IF:
             printf("TOK_IF`");
             break;
@@ -351,6 +354,18 @@ void printStmt(Stmt *stmt) {
             for (size_t i = 0; i < stmt->if_block.block->numItems; i++) {
                 Stmt *tempStmt =
                     *((Stmt **)indexVector(stmt->if_block.block, i));
+                printStmt(tempStmt);
+                printf("\n");
+            }
+            break;
+        }
+        case STMT_WHILE: {
+            printf("STMT_WHILE: ");
+            printExpr(stmt->while_block.cond);
+            printf("\n");
+            for (size_t i = 0; i < stmt->while_block.block->numItems; i++) {
+                Stmt *tempStmt =
+                    *((Stmt **)indexVector(stmt->while_block.block, i));
                 printStmt(tempStmt);
                 printf("\n");
             }

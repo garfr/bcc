@@ -463,6 +463,22 @@ void typeStmt(Scope *scope, Stmt *stmt) {
             }
             break;
         }
+        case STMT_WHILE: {
+            typeExpression(scope, stmt->while_block.cond);
+
+            if (stmt->while_block.cond->typeExpr->type != TYP_BOOL) {
+                queueError("Expression in 'while' statements must be a boolean",
+                           stmt->while_block.cond->start,
+                           stmt->while_block.cond->end);
+            }
+
+            for (size_t i = 0; i < stmt->while_block.block->numItems; i++) {
+                Stmt *tempStmt =
+                    *((Stmt **)indexVector(stmt->while_block.block, i));
+                typeStmt(scope, tempStmt);
+            }
+            break;
+        }
         case STMT_IF_ELSE: {
             typeExpression(scope, stmt->if_else.cond);
 

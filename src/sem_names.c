@@ -74,6 +74,14 @@ void resolveStmt(Scope* scope, Stmt* stmt) {
                     }
                     break;
                 }
+                case STMT_WHILE: {
+                    resolveExpr(scope, stmt->while_block.cond);
+                    for (size_t i = 0; i < stmt->while_block.block->numItems; i++) {
+                        Stmt* tempStmt = *((Stmt**)indexVector(stmt->while_block.block, i));
+                        resolveStmt(scope, tempStmt);
+                    }
+                    break;
+                }
                 case STMT_IF_ELSE: {
 
                     resolveExpr(scope, stmt->if_else.cond);
