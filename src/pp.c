@@ -78,8 +78,8 @@ void printToken(Token tok) {
         case TOK_COLON:
             printf("TOK_COLON");
             break;
-        case TOK_AMPERSAND:
-            printf("TOK_AMPERSAND");
+        case TOK_AMP:
+            printf("TOK_AMP");
             break;
         case TOK_COLONEQUAL:
             printf("TOK_COLONEQUAL");

@@ -275,16 +275,31 @@ void typeExpression(Scope *scope, Expr *exp) {
                     if (coerceAssignment(wantedType, thisExp->typeExpr) ==
                         NULL) {
                         queueError(msprintf("Function expected expression "
-                                            "of type %s, not "
-                                            "but got %s",
+                                            "of type '%s', "
+                                            "but got '%s'",
                                             stringOfType(wantedType),
-                                            thisExp->typeExpr),
+                                            stringOfType(thisExp->typeExpr)),
                                    thisExp->start, thisExp->end);
                     }
                 }
             }
         } break;
         case EXP_ADDROF: {
+            if (exp->addr.expr->type != EXP_VAR) {
+                queueError(
+                    "Can only take the address of a value that is guaranteed "
+                    "to be on the stack",
+                    exp->start, exp->end);
+                printErrors();
+            }
+
+            if (!((TypedEntry *)exp->addr.expr->var->data)->isMut &&
+                exp->addr.mut) {
+                queueError(
+                    "Cannot take a mutable reference to an immutable variable",
+                    exp->start, exp->end);
+                printErrors();
+            }
             typeExpression(scope, exp->addr.expr);
             Type *newType = calloc(1, sizeof(Type));
             newType->type = TYP_PTR;

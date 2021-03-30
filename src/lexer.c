@@ -229,7 +229,7 @@ Token getToken(Lexer *lex) {
                     case '.':
                         return makeTokenInplace(lex, TOK_PERIOD);
                     case '&':
-                        return makeTokenInplace(lex, TOK_AMPERSAND);
+                        return makeTokenInplace(lex, TOK_AMP);
                     case '@':
                         return makeTokenInplace(lex, TOK_AT);
                     case '{':

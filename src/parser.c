@@ -139,12 +139,19 @@ Type *parseType(Parser *parser) {
     Token tok = nextToken(parser->lex);
 
     switch (tok.type) {
-    case TOK_AMPERSAND: {
-        Type* nextType = parseType(parser);
+    case TOK_AMP: {
         Type* ret = calloc(1, sizeof(Type));
+        if (peekToken(parser->lex).type == TOK_MUT) {
+            nextToken(parser->lex);
+            ret->ptr.mut = true;
+        }
+        else {
+            ret->ptr.mut = false;
+        }
+
+        Type* nextType = parseType(parser);
         ret->type = TYP_PTR;
         ret->ptr.type = nextType;
-        ret->ptr.mut = false;
         return ret;
     }
     case TOK_SYM:
@@ -480,15 +487,21 @@ Expr *parseUnary(Parser *parser) {
             ret->deref = right;
             return ret;
         }
-        case TOK_AMPERSAND: {
-            Token startTok = nextToken(parser->lex);
-            Expr *right  = parseUnary(parser);
+        case TOK_AMP: {
             Expr *ret = calloc(1, sizeof(Expr));
+            Token startTok = nextToken(parser->lex);
+            if (peekToken(parser->lex).type == TOK_MUT) {
+                nextToken(parser->lex);
+                ret->addr.mut = true;
+            }
+            else {
+                ret->addr.mut = false;
+            }
             ret->type = EXP_ADDROF;
+            Expr* right = parseUnary(parser);
             ret->start = startTok.start;
             ret->end = right->end;
             ret->addr.expr = right;
-            ret->addr.mut = false;
             return ret;
         };
         default:
@@ -824,6 +837,26 @@ Stmt *parseStmt(Parser *parser) {
         return parseReturn(parser, tok);
     case TOK_AT:
         return parseAssignment(parser);
+    case TOK_MUT: {
+        Token firstTok = nextToken(parser->lex);
+        Token symTok = nextToken(parser->lex);
+        if (symTok.type != TOK_SYM) {
+            queueError("Expected symbol after keyword 'mut' in statement", symTok.start, symTok.end);
+            printErrors();
+        }
+
+        Token opTok = nextToken(parser->lex);
+        switch (opTok.type) {
+            case TOK_COLON:
+                return parseDec(parser, symTok, true);
+            case TOK_COLONEQUAL:
+                return parseInferredDec(parser, symTok, true);
+            default:
+                queueError("Expected ':=' or ':' after keyword 'mut' and symbol", firstTok.start, opTok.start);
+                printErrors();
+                exit(1);
+        }
+    }
     case TOK_SYM: {
         Token equalsTok = lookaheadToken(parser->lex);
         switch (equalsTok.type) {
@@ -832,11 +865,11 @@ Stmt *parseStmt(Parser *parser) {
         case TOK_COLON:
             nextToken(parser->lex);
             nextToken(parser->lex);
-            return parseDec(parser, tok, true);
+            return parseDec(parser, tok, false);
         case TOK_COLONEQUAL:
             nextToken(parser->lex);
             nextToken(parser->lex);
-            return parseInferredDec(parser, tok, true);
+            return parseInferredDec(parser, tok, false);
         default: {
             Expr *expr = parseExpr(parser);
             Token semiTok = nextToken(parser->lex);

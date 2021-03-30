@@ -32,7 +32,7 @@ enum TokenType {
 
     /* Punctuation */
     TOK_COLON,
-    TOK_AMPERSAND,
+    TOK_AMP,
     TOK_AT,
     TOK_DOUBLECOLON,
     TOK_SEMICOLON,
@@ -80,7 +80,7 @@ enum LexerState {
     LEX_COLON,
     LEX_SINGLE_QUOTE,
     LEX_EQUAL,
-    LEX_EXCLAMATION
+    LEX_EXCLAMATION,
 };
 
 typedef struct {
