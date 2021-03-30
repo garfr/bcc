@@ -22,6 +22,7 @@ enum TokenType {
     TOK_EXTERN,
     TOK_IF,
     TOK_ELSE,
+    TOK_WHILE,
     TOK_DO,
 
     /* Symbols, and other values */

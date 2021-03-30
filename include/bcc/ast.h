@@ -168,6 +168,12 @@ typedef struct Stmt {
         } if_else;
 
         struct {
+            Scope *scope1;
+            Vector *block;  // Stmt*
+            Expr *cond;
+        } while_block;
+
+        struct {
             HashEntry *var;
             Type *type;
             Expr *value;
