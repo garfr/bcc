@@ -104,7 +104,6 @@ char *generateBinaryOp(int op, Type *type) {
         case BINOP_DIV:
             return "div";
         case BINOP_EQUAL:
-        case BINOP_NOTEQUAL:
             switch (type->type) {
                 case TYP_S8:
                 case TYP_U8:
@@ -127,6 +126,30 @@ char *generateBinaryOp(int op, Type *type) {
                     return generateBinaryOp(op, type->typeEntry->data);
             }
             break;
+        case BINOP_NOTEQUAL:
+            switch (type->type) {
+                case TYP_S8:
+                case TYP_U8:
+                case TYP_S16:
+                case TYP_U16:
+                case TYP_S32:
+                case TYP_U32:
+                case TYP_BOOL:
+                case TYP_INTLIT:
+                case TYP_CHAR:
+                case TYP_VOID:
+                    return "cnew";
+                case TYP_S64:
+                case TYP_U64:
+                case TYP_FUN:
+                case TYP_RECORD:
+                case TYP_PTR:
+                    return "cnel";
+                case TYP_BINDING:
+                    return generateBinaryOp(op, type->typeEntry->data);
+            }
+            break;
+
         default:
             printf("Invalid binary operation.\n");
             exit(1);
