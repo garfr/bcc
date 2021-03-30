@@ -627,6 +627,39 @@ static void generateStatement(Scope *scope, Stmt *stmt) {
         fprintf(context.out, "@loc%d\n", loc2);
         break;
     }
+    case STMT_WHILE: {
+        char* expr = generateExpr(scope, stmt->while_block.cond, &copy);
+        int value1 = getNewNum();
+
+        int loc1, loc2, loc3;
+
+        loc1 = getNewNum();
+        loc2 = getNewNum();
+        loc3 = getNewNum();
+
+        fprintf(context.out, "@loc%d\n", loc1);
+
+        if (copy) {
+            fprintf(context.out, "\t%%v%d =%s copy %s\n", value1, generateType(stmt->while_block.cond->typeExpr), expr);
+        }
+        else {
+            fprintf(context.out, "\t%%v%d =%s %s\n", value1, generateType(stmt->while_block.cond->typeExpr), expr);
+        }
+
+        fprintf(context.out, "\tjnz %%v%d, @loc%d, @loc%d\n", value1, loc2, loc3);
+
+        fprintf(context.out, "@loc%d\n", loc2);
+
+        for (size_t i = 0; i < stmt->while_block.block->numItems; i++) {
+            Stmt* tempStmt = *((Stmt**)indexVector(stmt->while_block.block, i));
+            generateStatement(scope, tempStmt);
+        }
+
+        fprintf(context.out, "\tjmp @loc%d\n", loc1);
+
+        fprintf(context.out, "@loc%d\n", loc3);
+        break;
+    }
     case STMT_IF_ELSE: {
         char* expr = generateExpr(scope, stmt->if_else.cond, &copy);
         int value1 = getNewNum();
@@ -692,9 +725,9 @@ static void generateStatement(Scope *scope, Stmt *stmt) {
         }
         break;
     }
-default:
-                          printf("Sorry, cant codegen flow control yet.\n");
-                          exit(1);
+    default:
+        assert(false);
+        exit(1);
     }
 }
 
