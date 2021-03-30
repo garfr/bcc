@@ -112,6 +112,15 @@ else
     doOtherThing()
 end
 ```
+
+## While Statements
+
+```
+while x == 3 do
+    doThing()
+end
+```
+
 ## References
 
 Beans allows non-nullable pointers known as "references".  You can take a reference to a variable by putting ``&`` or ``&mut`` before the variables name.  You may only take a mutable reference to a variable if the variable itself is mutable.
