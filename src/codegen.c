@@ -382,9 +382,9 @@ char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
         *needsCopy = true;
         return msprintf("%d", translateCharacter(expr->character));
     case EXP_ADDROF:  {
-        if (expr->addrOf->type == EXP_VAR) {
+        if (expr->addr.expr->type == EXP_VAR) {
             *needsCopy = true;
-            return msprintf("%%%.*s", (int) expr->addrOf->var->id.len, expr->addrOf->var->id.text);
+            return msprintf("%%%.*s", (int) expr->addr.expr->var->id.len, expr->addr.expr->var->id.text);
         }
         assert(false); // This will be signalled as an erro in gen_stack.c
         return NULL;

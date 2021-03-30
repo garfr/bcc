@@ -34,7 +34,7 @@ void resolveExpr(Scope *scope, Expr *exp) {
         resolveExpr(scope, exp->binop.exp2);
         break;
     case EXP_ADDROF:
-        resolveExpr(scope, exp->addrOf);
+        resolveExpr(scope, exp->addr.expr);
         break;
     case EXP_DEREF:
         resolveExpr(scope, exp->deref);

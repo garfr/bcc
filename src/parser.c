@@ -143,7 +143,8 @@ Type *parseType(Parser *parser) {
         Type* nextType = parseType(parser);
         Type* ret = calloc(1, sizeof(Type));
         ret->type = TYP_PTR;
-        ret->ptrType = nextType;
+        ret->ptr.type = nextType;
+        ret->ptr.mut = false;
         return ret;
     }
     case TOK_SYM:
@@ -486,7 +487,8 @@ Expr *parseUnary(Parser *parser) {
             ret->type = EXP_ADDROF;
             ret->start = startTok.start;
             ret->end = right->end;
-            ret->addrOf = right;
+            ret->addr.expr = right;
+            ret->addr.mut = false;
             return ret;
         };
         default:

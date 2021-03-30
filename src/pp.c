@@ -175,8 +175,12 @@ void printType(Type *type) {
             printf("void");
             break;
         case TYP_PTR:
-            printf("&");
-            printType(type->ptrType);
+            if (type->ptr.mut) {
+                printf("&mut ");
+            } else {
+                printf("& ");
+            }
+            printType(type->ptr.type);
             break;
         case TYP_INTLIT:
             printf("TYP_INTLIT");
@@ -250,12 +254,16 @@ void printExpr(Expr *exp) {
             printf("EXP_VAR: '%.*s'", (int)exp->var->id.len, exp->var->id.text);
             break;
         case EXP_ADDROF:
-            printf("EXP_ADDROF: ");
-            printExpr(exp->addrOf);
+            if (exp->addr.mut) {
+                printf("EXP_ADDROF: &mut");
+            } else {
+                printf("EXP_ADDROF: &");
+            }
+            printExpr(exp->addr.expr);
             break;
         case EXP_DEREF:
             printf("EXP_DEREF: ");
-            printExpr(exp->addrOf);
+            printExpr(exp->deref);
             break;
         case EXP_BOOL:
             printf("EXP_BOOL: %s", exp->boolean ? "true" : "false");

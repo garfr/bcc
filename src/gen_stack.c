@@ -9,14 +9,14 @@
 void checkStackExpr(Scope *scope, Expr *exp) {
     switch (exp->type) {
         case EXP_ADDROF: {
-            if (exp->addrOf->type == EXP_VAR) {
-                ((TypedEntry *)exp->addrOf->var->data)->onStack = true;
+            if (exp->addr.expr->type == EXP_VAR) {
+                ((TypedEntry *)exp->addr.expr->var->data)->onStack = true;
             } else {
                 queueError(
                     "Can only take the address of variables, indexes, and "
                     "struct fields",
                     exp->start, exp->end);
-                checkStackExpr(scope, exp->addrOf);
+                checkStackExpr(scope, exp->addr.expr);
             }
             break;
         }

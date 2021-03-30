@@ -49,7 +49,10 @@ char *stringOfType(Type *type) {
         case TYP_BOOL:
             return "bool";
         case TYP_PTR:
-            return msprintf("&%s", stringOfType(type->ptrType));
+            if (type->ptr.mut) {
+                return msprintf("&mut %s", stringOfType(type->ptr.type));
+            }
+            return msprintf("&%s", stringOfType(type->ptr.type));
         case TYP_BINDING:
             return msprintf("%.*s", (int)type->typeEntry->id.len,
                             type->typeEntry->id.text);
@@ -88,9 +91,12 @@ Type *coerceBinop(int op, Type *type1, Type *type2) {
         return NULL;
     }
     if (type1->type == TYP_PTR && type2->type == TYP_PTR) {
+        if (type1->ptr.mut != type2->ptr.mut) {
+            return NULL;
+        }
         /*printType(type1->ptrType);*/
         /*printType(type2->ptrType);*/
-        return coerceBinop(op, type1->ptrType, type2->ptrType);
+        return coerceBinop(op, type1->ptr.type, type2->ptr.type);
     }
     switch (op) {
         case BINOP_ADD:
@@ -230,7 +236,11 @@ Type *coerceAssignment(Type *type1, Type *type2) {
         }
     }
     if (type1->type == TYP_PTR && type2->type == TYP_PTR) {
-        return coerceAssignment(type1->ptrType, type2->ptrType);
+        if (type1->ptr.mut != type2->ptr.mut) {
+            return NULL;
+        }
+
+        return coerceAssignment(type1->ptr.type, type2->ptr.type);
     }
     if (type1->type == type2->type) {
         return type1;
@@ -275,10 +285,11 @@ void typeExpression(Scope *scope, Expr *exp) {
             }
         } break;
         case EXP_ADDROF: {
-            typeExpression(scope, exp->addrOf);
+            typeExpression(scope, exp->addr.expr);
             Type *newType = calloc(1, sizeof(Type));
             newType->type = TYP_PTR;
-            newType->ptrType = exp->addrOf->typeExpr;
+            newType->ptr.type = exp->addr.expr->typeExpr;
+            newType->ptr.mut = exp->addr.mut;
             exp->typeExpr = newType;
             break;
         }
@@ -290,7 +301,7 @@ void typeExpression(Scope *scope, Expr *exp) {
                            exp->start, exp->end);
                 printErrors();
             }
-            exp->typeExpr = exp->deref->typeExpr->ptrType;
+            exp->typeExpr = exp->deref->typeExpr->ptr.type;
             break;
         }
         case EXP_INT:
@@ -524,7 +535,11 @@ void typeStmt(Scope *scope, Stmt *stmt) {
                         stmt->start, stmt->end);
                     printErrors();
                 }
-                type = coerceAssignment(entry->type->ptrType,
+                if (!entry->type->ptr.mut) {
+                    queueError("Cannot assign to immutable pointer to variable",
+                               stmt->start, stmt->end);
+                }
+                type = coerceAssignment(entry->type->ptr.type,
                                         stmt->assign.value->typeExpr);
             } else {
                 assert(false);

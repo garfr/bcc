@@ -40,7 +40,10 @@ typedef struct Type {
             Vector *vec;  // A linear list of HashEntries, that represents the
         } record;
 
-        struct Type *ptrType;
+        struct {
+            bool mut;
+            struct Type *type;
+        } ptr;
     };
 } Type;
 
@@ -86,7 +89,11 @@ typedef struct Expr {
             } op;
         } binop;
 
-        struct Expr *addrOf;
+        struct {
+            struct Expr *expr;
+            bool mut;
+        } addr;
+
         struct Expr *deref;
         struct {
             Vector *arguments;  // Expr*
