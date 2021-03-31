@@ -7,6 +7,10 @@
 #include "bcc/semantics.h"
 #include "bcc/utils.h"
 
+/* Notes: Throughout this file, a pointer to a bool called "needsCopy" is passed
+ * around.  This is because certain returned expressions require a copy to be
+ * assigned to IR temporaries, while others can be assigned without one */
+
 struct {
   FILE *out;
 } context;
@@ -55,6 +59,8 @@ calculateSize(Type *type) {
   exit(1);
 }
 
+/* Generates either 'w' or 'l' for a given type, which are the only types that
+ * QBE allows temporaries to have */
 static const char *
 generateType(Type *type) {
   switch (type->type) {
@@ -86,12 +92,14 @@ generateType(Type *type) {
   return NULL;
 }
 
+/* Generates a random new number */
 static int
 getNewNum() {
   static int cnt = 0;
   return cnt++;
 }
 
+/* Picks the correct binary op for a type */
 static char *
 generateBinaryOp(int op, Type *type) {
   switch (op) {
@@ -102,7 +110,21 @@ generateBinaryOp(int op, Type *type) {
     case BINOP_MULT:
       return "mul";
     case BINOP_DIV:
-      return "div";
+      switch (type->type) {
+        case TYP_S8:
+        case TYP_S16:
+        case TYP_S32:
+        case TYP_S64:
+          return "div";
+        case TYP_U8:
+        case TYP_U16:
+        case TYP_U32:
+        case TYP_U64:
+          return "udiv";
+        default:
+          assert(false);
+          return NULL;
+      }
     case BINOP_EQUAL:
       switch (type->type) {
         case TYP_S8:
@@ -157,6 +179,9 @@ generateBinaryOp(int op, Type *type) {
   return NULL;
 }
 
+/* Returns true if the given expression needs its own instruction in the IR, or
+ * false if the given instruction can be placed inline. The needsCopy parameter
+ * should be used to determine if a copy instruction is needed */
 static bool
 needsOwnInstruction(Expr *exp) {
   switch (exp->type) {
@@ -177,6 +202,8 @@ needsOwnInstruction(Expr *exp) {
   }
 }
 
+/* TODO: Move this to a different file for semantic analysis, as this should not
+ * be in the codegeneration phase */
 static int
 translateCharacter(Symbol sym) {
   if (sym.len >= 1) {
@@ -194,10 +221,11 @@ translateCharacter(Symbol sym) {
   exit(1);
 }
 
+// Forward declaration for mutual recursion
 static char *generateExpr(Scope *scope, Expr *expr, bool *needsCopy);
 
-/* And will not evaluate the right hand side if the first value evaluates to
- * false */
+/* A boolean 'and' will not evaluate the right hand side if the first value
+ * evaluates to false */
 static char *
 generateAnd(Scope *scope, Expr *expr, bool *needsCopy) {
 
@@ -250,7 +278,8 @@ generateAnd(Scope *scope, Expr *expr, bool *needsCopy) {
   return msprintf("%%v%d", loc3);
 }
 
-/*Or will not evaluate the right hand side if the first value evaluates to true
+/* A boolean 'or' will not evaluate the right hand side if the first value
+ * evaluates to true
  */
 char *
 generateOr(Scope *scope, Expr *expr, bool *needsCopy) {
@@ -304,6 +333,9 @@ generateOr(Scope *scope, Expr *expr, bool *needsCopy) {
   return msprintf("%%v%d", loc3);
 }
 
+/* Picks the correct load instruction for a given type. This is needed because
+ * if a item smaller than the size of the temporary is loaded, a bitshift is
+ * needed, and this varies depending on if the type is signed */
 char *
 pickLoadInst(Type *type) {
   switch (type->type) {
@@ -372,33 +404,143 @@ pickStoreInst(Type *type) {
 }
 
 static char *
+generateVarExpr(Expr *expr, bool *needsCopy) {
+  TypedEntry *entry = expr->var->data;
+
+  if (entry->onStack) {
+
+    int loc = getNewNum();
+    /* Fetch the location from the stack */
+    fprintf(context.out, "\t%%v%d =%s %s %%%.*s\n", loc,
+            generateType(entry->type), pickLoadInst(expr->typeExpr),
+            (int)expr->var->id.len, expr->var->id.text);
+    *needsCopy = true;
+    return msprintf("%%v%d", loc);
+  }
+
+  *needsCopy = true;
+  if (expr->typeExpr->type == TYP_FUN) {
+    return msprintf("$%.*s", (int)expr->var->id.len, expr->var->id.text);
+  } else {
+    return msprintf("%%%.*s", (int)expr->var->id.len, expr->var->id.text);
+  }
+}
+
+static char *
+generateBinOpExpr(Scope *scope, Expr *expr, bool *needsCopy) {
+
+  if (expr->binop.op == BINOP_AND) {
+    return generateAnd(scope, expr, needsCopy);
+  }
+  if (expr->binop.op == BINOP_OR) {
+    return generateOr(scope, expr, needsCopy);
+  }
+
+  int loc1 = getNewNum();
+  int loc2 = getNewNum();
+
+  char *tempexpr1 = generateExpr(scope, expr->binop.exp1, needsCopy);
+
+  char *expr1;
+  if (needsOwnInstruction(expr->binop.exp1)) {
+    if (*needsCopy) {
+      fprintf(context.out, "\t%%v%d =%s %s\n", loc1,
+              generateType(expr->typeExpr), tempexpr1);
+
+    } else {
+      fprintf(context.out, "\t%%v%d =%s copy %s\n", loc1,
+              generateType(expr->typeExpr), tempexpr1);
+    }
+    expr1 = msprintf("%%v%d", loc1);
+  } else {
+    expr1 = tempexpr1;
+  }
+
+  char *tempExpr2 = generateExpr(scope, expr->binop.exp2, needsCopy);
+
+  char *expr2;
+
+  if (needsOwnInstruction(expr->binop.exp2)) {
+    if (*needsCopy) {
+      fprintf(context.out, "\t%%v%d =%s %s\n", loc2,
+              generateType(expr->typeExpr), tempExpr2);
+    } else {
+      fprintf(context.out, "\t%%v%d =%s copy %s\n", loc2,
+              generateType(expr->typeExpr), tempExpr2);
+    }
+    expr2 = msprintf("%%v%d", loc1);
+  } else {
+
+    expr2 = tempExpr2;
+  }
+  *needsCopy = false;
+  return msprintf("%s %s, %s", generateBinaryOp(expr->binop.op, expr->typeExpr),
+                  expr1, expr2);
+}
+
+static char *
+generateFuncallExpr(Scope *scope, Expr *expr, bool *needsCopy) {
+  Vector *exprVec =
+      newVector(sizeof(char *), expr->funcall.arguments->numItems);
+  if (expr->funcall.arguments->numItems > 0) {
+    for (size_t i = 0; i < expr->funcall.arguments->numItems; i++) {
+      Expr *exp = *((Expr **)indexVector(expr->funcall.arguments, i));
+      char *tempExpr;
+      if (needsOwnInstruction(exp)) {
+        int tempLoc = getNewNum();
+        char *tempTempExpr = generateExpr(scope, exp, needsCopy);
+        if (*needsCopy) {
+          fprintf(context.out, "\t%%v%d =%s copy %s\n", tempLoc,
+                  generateType(exp->typeExpr), tempTempExpr);
+          tempExpr = msprintf("%%v%d", tempLoc);
+        } else {
+          fprintf(context.out, "\t%%v%d =%s %s\n", tempLoc,
+                  generateType(exp->typeExpr), tempTempExpr);
+          tempExpr = msprintf("%%v%d", tempLoc);
+        }
+      } else {
+        tempExpr = generateExpr(scope, exp, needsCopy);
+      }
+      pushVector(exprVec, &tempExpr);
+    }
+  }
+
+  int location = getNewNum();
+
+  if (expr->typeExpr->type != TYP_VOID) {
+    fprintf(context.out, "\t%%v%d =%s call $%.*s(", location,
+            generateType(expr->typeExpr), (int)expr->funcall.name.len,
+            expr->funcall.name.text);
+  } else {
+    fprintf(context.out, "\tcall $%.*s(", (int)expr->funcall.name.len,
+            expr->funcall.name.text);
+  }
+
+  if (expr->funcall.arguments->numItems > 0) {
+    for (size_t i = 0; i < expr->funcall.arguments->numItems - 1; i++) {
+      Expr *exp = *((Expr **)indexVector(expr->funcall.arguments, i));
+      char *expr = *((char **)indexVector(exprVec, i));
+      fprintf(context.out, "%s %s, ", generateType(exp->typeExpr), expr);
+    }
+    Expr *exp = *((Expr **)indexVector(expr->funcall.arguments,
+                                       expr->funcall.arguments->numItems - 1));
+    char *tempExpr =
+        *((char **)indexVector(exprVec, expr->funcall.arguments->numItems - 1));
+    fprintf(context.out, "%s %s", generateType(exp->typeExpr), tempExpr);
+  }
+  fprintf(context.out, ")\n");
+  *needsCopy = true;
+  return msprintf("%%v%d", location);
+}
+
+static char *
 generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
   switch (expr->type) {
     case EXP_INT:
       *needsCopy = true;
       return msprintf("%.*s", (int)expr->intlit.len, expr->intlit.text);
     case EXP_VAR:
-      {
-        TypedEntry *entry = expr->var->data;
-
-        if (entry->onStack) {
-
-          int loc = getNewNum();
-          /* Fetch the location from the stack */
-          fprintf(context.out, "\t%%v%d =%s %s %%%.*s\n", loc,
-                  generateType(entry->type), pickLoadInst(expr->typeExpr),
-                  (int)expr->var->id.len, expr->var->id.text);
-          *needsCopy = true;
-          return msprintf("%%v%d", loc);
-        }
-
-        *needsCopy = true;
-        if (expr->typeExpr->type == TYP_FUN) {
-          return msprintf("$%.*s", (int)expr->var->id.len, expr->var->id.text);
-        } else {
-          return msprintf("%%%.*s", (int)expr->var->id.len, expr->var->id.text);
-        }
-      }
+      return generateVarExpr(expr, needsCopy);
     case EXP_BOOL:
       *needsCopy = true;
       return msprintf("%d", expr->boolean ? 1 : 0);
@@ -433,112 +575,9 @@ generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
         return msprintf("%%v%d", loc2);
       }
     case EXP_BINOP:
-      {
-        if (expr->binop.op == BINOP_AND) {
-          return generateAnd(scope, expr, needsCopy);
-        }
-        if (expr->binop.op == BINOP_OR) {
-          return generateOr(scope, expr, needsCopy);
-        }
-
-        int loc1 = getNewNum();
-        int loc2 = getNewNum();
-
-        char *tempexpr1 = generateExpr(scope, expr->binop.exp1, needsCopy);
-
-        char *expr1;
-        if (needsOwnInstruction(expr->binop.exp1)) {
-          if (*needsCopy) {
-            fprintf(context.out, "\t%%v%d =%s %s\n", loc1,
-                    generateType(expr->typeExpr), tempexpr1);
-
-          } else {
-            fprintf(context.out, "\t%%v%d =%s copy %s\n", loc1,
-                    generateType(expr->typeExpr), tempexpr1);
-          }
-          expr1 = msprintf("%%v%d", loc1);
-        } else {
-          expr1 = tempexpr1;
-        }
-
-        char *tempExpr2 = generateExpr(scope, expr->binop.exp2, needsCopy);
-
-        char *expr2;
-
-        if (needsOwnInstruction(expr->binop.exp2)) {
-          if (*needsCopy) {
-            fprintf(context.out, "\t%%v%d =%s %s\n", loc2,
-                    generateType(expr->typeExpr), tempExpr2);
-          } else {
-            fprintf(context.out, "\t%%v%d =%s copy %s\n", loc2,
-                    generateType(expr->typeExpr), tempExpr2);
-          }
-          expr2 = msprintf("%%v%d", loc1);
-        } else {
-
-          expr2 = tempExpr2;
-        }
-        *needsCopy = false;
-        return msprintf("%s %s, %s",
-                        generateBinaryOp(expr->binop.op, expr->typeExpr), expr1,
-                        expr2);
-      }
-
+      return generateBinOpExpr(scope, expr, needsCopy);
     case EXP_FUNCALL:
-      {
-
-        Vector *exprVec =
-            newVector(sizeof(char *), expr->funcall.arguments->numItems);
-        if (expr->funcall.arguments->numItems > 0) {
-          for (size_t i = 0; i < expr->funcall.arguments->numItems; i++) {
-            Expr *exp = *((Expr **)indexVector(expr->funcall.arguments, i));
-            char *tempExpr;
-            if (needsOwnInstruction(exp)) {
-              int tempLoc = getNewNum();
-              char *tempTempExpr = generateExpr(scope, exp, needsCopy);
-              if (*needsCopy) {
-                fprintf(context.out, "\t%%v%d =%s copy %s\n", tempLoc,
-                        generateType(exp->typeExpr), tempTempExpr);
-                tempExpr = msprintf("%%v%d", tempLoc);
-              } else {
-                fprintf(context.out, "\t%%v%d =%s %s\n", tempLoc,
-                        generateType(exp->typeExpr), tempTempExpr);
-                tempExpr = msprintf("%%v%d", tempLoc);
-              }
-            } else {
-              tempExpr = generateExpr(scope, exp, needsCopy);
-            }
-            pushVector(exprVec, &tempExpr);
-          }
-        }
-
-        int location = getNewNum();
-
-        if (expr->typeExpr->type != TYP_VOID) {
-          fprintf(context.out, "\t%%v%d =%s call $%.*s(", location,
-                  generateType(expr->typeExpr), (int)expr->funcall.name.len,
-                  expr->funcall.name.text);
-        } else {
-          fprintf(context.out, "\tcall $%.*s(", (int)expr->funcall.name.len,
-                  expr->funcall.name.text);
-        }
-
-        if (expr->funcall.arguments->numItems > 0) {
-          for (size_t i = 0; i < expr->funcall.arguments->numItems - 1; i++) {
-            Expr *exp = *((Expr **)indexVector(expr->funcall.arguments, i));
-            char *expr = *((char **)indexVector(exprVec, i));
-            fprintf(context.out, "%s %s, ", generateType(exp->typeExpr), expr);
-          }
-          Expr *exp = *((Expr **)indexVector(
-              expr->funcall.arguments, expr->funcall.arguments->numItems - 1));
-          char *tempExpr = *((char **)indexVector(
-              exprVec, expr->funcall.arguments->numItems - 1));
-          fprintf(context.out, "%s %s", generateType(exp->typeExpr), tempExpr);
-        }
-        fprintf(context.out, ")\n");
-        *needsCopy = true;
-        return msprintf("%%v%d", location);
-      }
+      return generateFuncallExpr(scope, expr, needsCopy);
     case EXP_RECORDLIT:
       printf("No funcalls or record lits yet.\n");
       exit(1);
@@ -547,9 +586,118 @@ generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
 }
 
 static void
+generateAssign(Scope *scope, Stmt *stmt, bool *needsCopy) {
+  if (stmt->assign.lval->type == LVAL_VAR) {
+    TypedEntry *entry = stmt->assign.lval->var.entry->data;
+    char *expr = generateExpr(scope, stmt->assign.value, needsCopy);
+    int loc = getNewNum();
+    if (entry->onStack) {
+      if (*needsCopy) {
+        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc,
+                generateType(stmt->assign.value->typeExpr), expr);
+      } else {
+        fprintf(context.out, "\t%%v%d =%s %s\n", loc,
+                generateType(stmt->assign.value->typeExpr), expr);
+      }
+      fprintf(context.out, "\t%s %%v%d, %%%.*s\n",
+              pickStoreInst(stmt->assign.value->typeExpr), loc,
+              (int)stmt->assign.lval->var.entry->id.len,
+              stmt->assign.lval->var.entry->id.text);
+    } else {
+      if (*needsCopy) {
+        fprintf(context.out, "\t%%%.*s =%s copy %s\n",
+                (int)stmt->assign.lval->var.entry->id.len,
+                stmt->assign.lval->var.entry->id.text,
+                generateType(stmt->assign.value->typeExpr), expr);
+      } else {
+        fprintf(context.out, "\t%%%.*s =%s %s\n",
+                (int)stmt->assign.lval->var.entry->id.len,
+                stmt->assign.lval->var.entry->id.text,
+                generateType(stmt->assign.value->typeExpr), expr);
+      }
+    }
+  }
+  if (stmt->assign.lval->type == LVAL_DEREF) {
+    TypedEntry *entry = stmt->assign.lval->deref.entry->data;
+    char *expr = generateExpr(scope, stmt->assign.value, needsCopy);
+    if (entry->onStack) {
+      int loc = getNewNum(); // Stores the actual address of the variable, not
+                             // the address of the address on the stack
+      fprintf(context.out, "\t%%v%d =l loadl %%%.*s\n", loc,
+              (int)stmt->assign.lval->deref.sym.len,
+              stmt->assign.lval->deref.sym.text);
+
+      int loc2 = getNewNum();
+      if (*needsCopy) {
+        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc2,
+                generateType(stmt->assign.value->typeExpr), expr);
+      } else {
+        fprintf(context.out, "\t%%v%d =%s %s\n", loc2,
+                generateType(stmt->assign.value->typeExpr), expr);
+      }
+      fprintf(context.out, "\t%s %%v%d, %%v%d\n",
+              pickStoreInst(stmt->assign.value->typeExpr), loc2, loc);
+    } else {
+
+      int loc = getNewNum();
+      if (*needsCopy) {
+        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc,
+                generateType(stmt->assign.value->typeExpr), expr);
+      } else {
+        fprintf(context.out, "\t%%v%d =%s %s\n", loc,
+                generateType(stmt->assign.value->typeExpr), expr);
+      }
+
+      fprintf(context.out, "\t%s %%v%d, %%%.*s\n",
+              pickStoreInst(stmt->assign.value->typeExpr), loc,
+              (int)stmt->assign.lval->deref.sym.len,
+              stmt->assign.lval->deref.sym.text);
+    }
+  }
+}
+
+static void
+generateDecAssign(Scope *scope, Stmt *stmt, bool *needsCopy) {
+  TypedEntry *entry = stmt->dec_assign.var->data;
+  char *expr = generateExpr(scope, stmt->dec_assign.value, needsCopy);
+
+  if (entry->onStack) {
+    fprintf(context.out, "\t%%%.*s =l alloc4 %ld\n",
+            (int)stmt->dec_assign.var->id.len, stmt->dec_assign.var->id.text,
+            calculateSize(stmt->dec_assign.type));
+    int loc = getNewNum();
+
+    if (*needsCopy) {
+      fprintf(context.out, "\t%%v%d =%s copy %s\n", loc,
+              generateType(stmt->dec_assign.type), expr);
+    } else {
+      fprintf(context.out, "\t%%v%d =%s %s\n", loc,
+              generateType(stmt->dec_assign.type), expr);
+    }
+
+    fprintf(context.out, "\t%s %%v%d, %%%.*s\n",
+            pickStoreInst(stmt->dec_assign.type), loc,
+            (int)stmt->dec_assign.var->id.len, stmt->dec_assign.var->id.text);
+
+  }
+
+  else {
+    if (*needsCopy) {
+      fprintf(context.out, "\t%%%.*s =%s copy %s\n",
+              (int)stmt->dec_assign.var->id.len, stmt->dec_assign.var->id.text,
+              generateType(stmt->dec_assign.value->typeExpr), expr);
+    } else {
+      fprintf(context.out, "\t%%%.*s =%s %s\n",
+              (int)stmt->dec_assign.var->id.len, stmt->dec_assign.var->id.text,
+              generateType(stmt->dec_assign.value->typeExpr), expr);
+    }
+  }
+}
+
+static void
 generateStatement(Scope *scope, Stmt *stmt) {
 
-  bool copy;
+  bool needsCopy;
   switch (stmt->type) {
     case STMT_DEC:
       {
@@ -564,96 +712,27 @@ generateStatement(Scope *scope, Stmt *stmt) {
       }
 
     case STMT_EXPR:
-      generateExpr(scope, stmt->singleExpr, &copy);
+      generateExpr(scope, stmt->singleExpr, &needsCopy);
       break;
     case STMT_ASSIGN:
-      {
-        if (stmt->assign.lval->type == LVAL_VAR) {
-          TypedEntry *entry = stmt->assign.lval->var.entry->data;
-          char *expr = generateExpr(scope, stmt->assign.value, &copy);
-          int loc = getNewNum();
-          if (entry->onStack) {
-            if (copy) {
-              fprintf(context.out, "\t%%v%d =%s copy %s\n", loc,
-                      generateType(stmt->assign.value->typeExpr), expr);
-            } else {
-              fprintf(context.out, "\t%%v%d =%s %s\n", loc,
-                      generateType(stmt->assign.value->typeExpr), expr);
-            }
-            fprintf(context.out, "\t%s %%v%d, %%%.*s\n",
-                    pickStoreInst(stmt->assign.value->typeExpr), loc,
-                    (int)stmt->assign.lval->var.entry->id.len,
-                    stmt->assign.lval->var.entry->id.text);
-          } else {
-            if (copy) {
-              fprintf(context.out, "\t%%%.*s =%s copy %s\n",
-                      (int)stmt->assign.lval->var.entry->id.len,
-                      stmt->assign.lval->var.entry->id.text,
-                      generateType(stmt->assign.value->typeExpr), expr);
-            } else {
-              fprintf(context.out, "\t%%%.*s =%s %s\n",
-                      (int)stmt->assign.lval->var.entry->id.len,
-                      stmt->assign.lval->var.entry->id.text,
-                      generateType(stmt->assign.value->typeExpr), expr);
-            }
-          }
-        }
-        if (stmt->assign.lval->type == LVAL_DEREF) {
-          TypedEntry *entry = stmt->assign.lval->deref.entry->data;
-          char *expr = generateExpr(scope, stmt->assign.value, &copy);
-          if (entry->onStack) {
-            int loc =
-                getNewNum(); // Stores the actual address of the variable, not
-                             // the address of the address on the stack
-            fprintf(context.out, "\t%%v%d =l loadl %%%.*s\n", loc,
-                    (int)stmt->assign.lval->deref.sym.len,
-                    stmt->assign.lval->deref.sym.text);
-
-            int loc2 = getNewNum();
-            if (copy) {
-              fprintf(context.out, "\t%%v%d =%s copy %s\n", loc2,
-                      generateType(stmt->assign.value->typeExpr), expr);
-            } else {
-              fprintf(context.out, "\t%%v%d =%s %s\n", loc2,
-                      generateType(stmt->assign.value->typeExpr), expr);
-            }
-            fprintf(context.out, "\t%s %%v%d, %%v%d\n",
-                    pickStoreInst(stmt->assign.value->typeExpr), loc2, loc);
-          } else {
-
-            int loc = getNewNum();
-            if (copy) {
-              fprintf(context.out, "\t%%v%d =%s copy %s\n", loc,
-                      generateType(stmt->assign.value->typeExpr), expr);
-            } else {
-              fprintf(context.out, "\t%%v%d =%s %s\n", loc,
-                      generateType(stmt->assign.value->typeExpr), expr);
-            }
-
-            fprintf(context.out, "\t%s %%v%d, %%%.*s\n",
-                    pickStoreInst(stmt->assign.value->typeExpr), loc,
-                    (int)stmt->assign.lval->deref.sym.len,
-                    stmt->assign.lval->deref.sym.text);
-          }
-        }
-        break;
-      }
+      generateAssign(scope, stmt, &needsCopy);
+      return;
     case STMT_RETURN:
       {
         if (stmt->returnExp == NULL) {
 
           fprintf(context.out, "\tret\n");
         } else {
-          char *expr = generateExpr(scope, stmt->returnExp, &copy);
+          char *expr = generateExpr(scope, stmt->returnExp, &needsCopy);
           fprintf(context.out, "\tret %s\n", expr);
         }
         break;
       }
     case STMT_IF:
       {
-        char *expr = generateExpr(scope, stmt->if_block.cond, &copy);
+        char *expr = generateExpr(scope, stmt->if_block.cond, &needsCopy);
         int value1 = getNewNum();
-        if (copy) {
+        if (needsCopy) {
 
           fprintf(context.out, "\t%%v%d =%s copy %s\n", value1,
                   generateType(stmt->if_block.cond->typeExpr), expr);
@@ -675,7 +754,7 @@ generateStatement(Scope *scope, Stmt *stmt) {
       }
     case STMT_WHILE:
       {
-        char *expr = generateExpr(scope, stmt->while_block.cond, &copy);
+        char *expr = generateExpr(scope, stmt->while_block.cond, &needsCopy);
         int value1 = getNewNum();
 
         int loc1, loc2, loc3;
@@ -686,7 +765,7 @@ generateStatement(Scope *scope, Stmt *stmt) {
 
         fprintf(context.out, "@loc%d\n", loc1);
 
-        if (copy) {
+        if (needsCopy) {
           fprintf(context.out, "\t%%v%d =%s copy %s\n", value1,
                   generateType(stmt->while_block.cond->typeExpr), expr);
         } else {
@@ -711,9 +790,9 @@ generateStatement(Scope *scope, Stmt *stmt) {
       }
     case STMT_IF_ELSE:
       {
-        char *expr = generateExpr(scope, stmt->if_else.cond, &copy);
+        char *expr = generateExpr(scope, stmt->if_else.cond, &needsCopy);
         int value1 = getNewNum();
-        if (copy) {
+        if (needsCopy) {
           fprintf(context.out, "\t%%v%d =%s copy %s\n", value1,
                   generateType(stmt->if_else.cond->typeExpr), expr);
         } else {
@@ -740,47 +819,8 @@ generateStatement(Scope *scope, Stmt *stmt) {
         break;
       }
     case STMT_DEC_ASSIGN:
-      {
-        TypedEntry *entry = stmt->dec_assign.var->data;
-        char *expr = generateExpr(scope, stmt->dec_assign.value, &copy);
-
-        if (entry->onStack) {
-          fprintf(context.out, "\t%%%.*s =l alloc4 %ld\n",
-                  (int)stmt->dec_assign.var->id.len,
-                  stmt->dec_assign.var->id.text,
-                  calculateSize(stmt->dec_assign.type));
-          int loc = getNewNum();
-
-          if (copy) {
-            fprintf(context.out, "\t%%v%d =%s copy %s\n", loc,
-                    generateType(stmt->dec_assign.type), expr);
-          } else {
-            fprintf(context.out, "\t%%v%d =%s %s\n", loc,
-                    generateType(stmt->dec_assign.type), expr);
-          }
-
-          fprintf(context.out, "\t%s %%v%d, %%%.*s\n",
-                  pickStoreInst(stmt->dec_assign.type), loc,
-                  (int)stmt->dec_assign.var->id.len,
-                  stmt->dec_assign.var->id.text);
-
-        }
-
-        else {
-          if (copy) {
-            fprintf(context.out, "\t%%%.*s =%s copy %s\n",
-                    (int)stmt->dec_assign.var->id.len,
-                    stmt->dec_assign.var->id.text,
-                    generateType(stmt->dec_assign.value->typeExpr), expr);
-          } else {
-            fprintf(context.out, "\t%%%.*s =%s %s\n",
-                    (int)stmt->dec_assign.var->id.len,
-                    stmt->dec_assign.var->id.text,
-                    generateType(stmt->dec_assign.value->typeExpr), expr);
-          }
-        }
-        break;
-      }
+      generateDecAssign(scope, stmt, &needsCopy);
+      return;
     default:
       assert(false);
       exit(1);
