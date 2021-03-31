@@ -787,13 +787,47 @@ parseLVal(Parser *parser) {
 }
 
 static Stmt *
+parseCompoundAssign(Parser *parser, LVal *lval, int type) {
+  Expr* expr = parseExpr(parser);
+
+  Token finalTok = nextToken(parser->lex);
+  if (finalTok.type != TOK_NEWLINE && finalTok.type != TOK_SEMICOLON) {
+    queueError("Expected newline or semicolon after compound assignment", finalTok.start, finalTok.end);
+    printErrors();
+  }
+
+  Stmt* ret = calloc(1, sizeof(Stmt));
+
+  ret->compound_assign.lval = lval;
+  ret->compound_assign.op = type;
+  ret->compound_assign.value = expr;
+  ret->type = STMT_COMPOUND_ASSIGN;
+  ret->start = lval->start;
+  ret->end = expr->end;
+
+  return ret;
+}
+
+static Stmt *
 parseAssignment(Parser *parser) {
   LVal *lval = parseLVal(parser);
 
   Token equalTok = nextToken(parser->lex);
-  if (equalTok.type != TOK_EQUAL) {
-    queueError("Expected '=' after l-value in assignment", equalTok.start,
-               equalTok.end);
+  switch (equalTok.type) {
+    case TOK_PLUS_EQ:
+      return parseCompoundAssign(parser, lval, ASSIGN_ADD);
+    case TOK_MINUS_EQ:
+      return parseCompoundAssign(parser, lval, ASSIGN_SUB);
+    case TOK_STAR_EQ:
+      return parseCompoundAssign(parser, lval, ASSIGN_MUL);
+    case TOK_SLASH_EQ:
+      return parseCompoundAssign(parser, lval, ASSIGN_DIV);
+    case TOK_EQUAL:
+      break;
+    default:
+      queueError("Expected '=', '+=', '-=', '*=', or '/=' after l-value in assignment", equalTok.start,
+                 equalTok.end);
+      equalTok = continueUntil(parser->lex, TOK_EQUAL_BITS);
   }
 
   Expr *value = parseExpr(parser);
@@ -1006,6 +1040,10 @@ parseStmt(Parser *parser) {
       {
         Token equalsTok = lookaheadToken(parser->lex);
         switch (equalsTok.type) {
+          case TOK_PLUS_EQ:
+          case TOK_MINUS_EQ:
+          case TOK_STAR_EQ:
+          case TOK_SLASH_EQ:
           case TOK_EQUAL:
             return parseAssignment(parser);
           case TOK_COLON:

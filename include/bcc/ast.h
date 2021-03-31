@@ -145,6 +145,7 @@ typedef struct Stmt {
     STMT_DEC,
     STMT_DEC_ASSIGN,
     STMT_ASSIGN,
+    STMT_COMPOUND_ASSIGN,
     STMT_RETURN,
     STMT_EXPR,
     STMT_WHILE,
@@ -188,6 +189,17 @@ typedef struct Stmt {
       LVal *lval;
       Expr *value;
     } assign;
+
+    struct {
+      LVal *lval;
+      Expr *value;
+      enum {
+        ASSIGN_ADD,
+        ASSIGN_SUB,
+        ASSIGN_MUL,
+        ASSIGN_DIV,
+      } op;
+    } compound_assign;
 
     Expr *returnExp;
     Expr *singleExpr;
