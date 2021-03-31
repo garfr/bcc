@@ -711,9 +711,64 @@ generateCompoundAssign(Scope *scope, Stmt* stmt, bool *needsCopy) {
           loc1);
     }
   }
+  else if (stmt->assign.lval->type == LVAL_DEREF) {
+
+    TypedEntry *entry = stmt->compound_assign.lval->var.entry->data;
+    char *expr = generateExpr(scope, stmt->compound_assign.value, needsCopy);
+    if (entry->onStack) {
+      int loc1 = getNewNum(); // Stores the value of ptr from the stack
+      int loc2 = getNewNum(); // Stores the value pointed to by the ptr
+      int loc3 = getNewNum(); // Stores the value of the expression
+      int loc4 = getNewNum(); // Stores the new value, that will be stored back into memory 
+
+      fprintf(context.out, "\t%%v%d =l loadl %%%.*s\n", loc1, 
+          (int) stmt->compound_assign.lval->deref.sym.len, 
+          stmt->compound_assign.lval->deref.sym.text);
+
+      fprintf(context.out, "\t%%v%d =%s %s %%v%d\n", loc2, 
+          generateType(entry->type), pickLoadInst(entry->type), loc1);
+
+      if (*needsCopy) {
+        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc3, 
+            generateType(stmt->compound_assign.value->typeExpr), expr);
+      }
+      else {
+        fprintf(context.out, "\t%%v%d =%s %s\n", loc3, 
+            generateType(stmt->compound_assign.value->typeExpr), expr);
+      }
+
+      fprintf(context.out, "\t%%v%d =%s %s %%v%d, %%v%d\n", loc4,
+          generateType(entry->type),  generateBinaryOp(stmt->compound_assign.op, entry->type),
+          loc2, loc3);
+
+      fprintf(context.out, "\t%s %%v%d, %%v%d\n", pickStoreInst(entry->type), loc4, loc2);
+  }
   else {
-    assert(false);
-    exit(1);
+    int loc1 = getNewNum(); // Stores the value pointed to by the variable
+    int loc2 = getNewNum(); // Stores the value of the expression
+    int loc3 = getNewNum(); // Stores the new value, that will be stored back into memory 
+
+    fprintf(context.out, "\t%%v%d =%s %s %%%.*s\n", loc1, generateType(entry->type->ptr.type),
+        pickLoadInst(entry->type), (int) stmt->compound_assign.lval->deref.sym.len,
+        stmt->compound_assign.lval->deref.sym.text);
+
+      if (*needsCopy) {
+        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc2, 
+            generateType(stmt->compound_assign.value->typeExpr), expr);
+      }
+      else {
+        fprintf(context.out, "\t%%v%d =%s %s\n", loc2, 
+            generateType(stmt->compound_assign.value->typeExpr), expr);
+      }
+
+      fprintf(context.out, "\t%%v%d =%s %s %%v%d, %%v%d\n", loc3, 
+          generateType(entry->type->ptr.type), generateBinaryOp(stmt->compound_assign.op, entry->type->ptr.type),
+          loc1, loc2);
+
+      fprintf(context.out, "\t%s %%v%d, %%%.*s\n", pickStoreInst(entry->type->ptr.type),
+          loc3, (int) stmt->compound_assign.lval->deref.sym.len,
+          stmt->compound_assign.lval->deref.sym.text);
+  }
   }
 }
 static void
