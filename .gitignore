@@ -3,7 +3,6 @@
 *.o
 *.asm
 *.out
-objs/
 bcc
 a.out
 main
@@ -14,3 +13,4 @@ test
 *.s
 tests/
 !include/bcc
+build

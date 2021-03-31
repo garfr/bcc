@@ -1,10 +1,9 @@
 #!/bin/sh
 
+mkdir build
 git clone git://c9x.me/qbe.git 
 cd qbe
 make 
-cp obj/qbe ../qbe-exe
+cp obj/qbe ../build/
 cd ..
 rm -rf qbe
-mv qbe-exe qbe
-mkdir objs
