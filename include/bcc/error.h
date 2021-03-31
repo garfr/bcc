@@ -4,9 +4,9 @@
 #include <stddef.h>
 
 typedef struct Error {
-    char *message;
-    size_t start;
-    size_t end;
+  char *message;
+  size_t start;
+  size_t end;
 } Error;
 
 void queueError(char *message, size_t start, size_t end);

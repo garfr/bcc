@@ -1,4 +1,5 @@
 #pragma once
+
 #include "bcc/ast.h"
 
 /* AST traversers */

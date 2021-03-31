@@ -10,4 +10,5 @@ void printToken(Token tok);
 void printType(Type *type);
 void printExpr(Expr *exp);
 void printStmt(Stmt *stmt);
+void printLVal(LVal *lval);
 void printAST(AST *ast);

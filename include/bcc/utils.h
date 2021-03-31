@@ -12,8 +12,8 @@ char *msprintf(const char *format, ...);
 
 /* A fat pointer to a location in the file being compiled */
 typedef struct {
-    const unsigned char *text;
-    size_t len;
+  const unsigned char *text;
+  size_t len;
 } Symbol;
 
 bool compareSymbol(Symbol sym1, Symbol sym2);
@@ -32,16 +32,16 @@ bool compareSymbolStr(Symbol sym, const char *str);
 typedef struct HashEntry HashEntry;
 
 typedef struct {
-    size_t numBuckets;
-    size_t usedBuckets;
-    size_t entries;
-    HashEntry **buckets;
+  size_t numBuckets;
+  size_t usedBuckets;
+  size_t entries;
+  HashEntry **buckets;
 } Hashtbl;
 
 typedef struct HashEntry {
-    Symbol id;
-    void *data;
-    struct HashEntry *next;
+  Symbol id;
+  void *data;
+  struct HashEntry *next;
 } HashEntry;
 
 Hashtbl *newHashtbl(size_t initBuckets);
@@ -58,11 +58,11 @@ HashEntry *insertHashtbl(Hashtbl *tbl, Symbol sym, void *data);
  * it may give this some typesafe wrappers in the future
  */
 typedef struct {
-    void *data;
-    size_t itemSize;
-    /* Both of these values are in number of entries, not number of bytes */
-    size_t itemCapacity;
-    size_t numItems;
+  void *data;
+  size_t itemSize;
+  /* Both of these values are in number of entries, not number of bytes */
+  size_t itemCapacity;
+  size_t numItems;
 } Vector;
 
 /* Item size is the number of bytes needed to store the type in the vector */
@@ -74,8 +74,8 @@ void *indexVector(Vector *vec, size_t index);
 
 /* A lexical scope */
 typedef struct Scope {
-    struct Scope *upScope;
-    Hashtbl *vars;
+  struct Scope *upScope;
+  Hashtbl *vars;
 } Scope;
 
 /* Searches through a scope to find an entry for a symbol */

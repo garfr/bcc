@@ -8,3 +8,4 @@ void allocateToStack(AST *ast);
 
 void generateCode(AST *ast, FILE *file);
 
+void allocateToStack(AST *ast);
