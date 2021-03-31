@@ -479,6 +479,14 @@ parseBinop(Parser *parser) {
       return BINOP_AND;
     case TOK_OR:
       return BINOP_OR;
+    case TOK_LANGLE:
+      return BINOP_LESS;
+    case TOK_RANGLE:
+      return BINOP_GREAT;
+    case TOK_LANGLE_EQ:
+      return BINOP_LESS_EQ;
+    case TOK_RANGLE_EQ:
+      return BINOP_GREAT_EQ;
     default:
       queueError(msprintf("Expected arithmetic operation"), tok.start, tok.end);
       /* This doesn't need to fail but idc */
@@ -565,8 +573,13 @@ static Expr *
 parseComparison(Parser *parser) {
   Expr *exp = parseTerm(parser);
 
-  while (peekToken(parser->lex).type == TOK_DOUBLEEQUAL ||
-         peekToken(parser->lex).type == TOK_NOTEQUAL) {
+  // So the while loop doesn't need to call
+  // peekToken for each case
+  int whileType = peekToken(parser->lex).type;
+
+  while (whileType == TOK_EQUAL || whileType == TOK_NOTEQUAL ||
+         whileType == TOK_LANGLE || whileType == TOK_RANGLE ||
+         whileType == TOK_LANGLE_EQ || whileType == TOK_RANGLE_EQ) {
     int op = parseBinop(parser);
     Expr *right = parseTerm(parser);
     Expr *newExpr = exprFromTwoPoints(exp->start, right->end, EXP_BINOP);
@@ -575,6 +588,8 @@ parseComparison(Parser *parser) {
     newExpr->binop.op = op;
     newExpr->typeExpr = NULL;
     exp = newExpr;
+
+    whileType = peekToken(parser->lex).type;
   }
 
   return exp;
