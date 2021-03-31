@@ -95,7 +95,7 @@ coerceBinop(int op, Type *type1, Type *type2) {
   switch (op) {
     case BINOP_ADD:
     case BINOP_SUB:
-    case BINOP_MULT:
+    case BINOP_MUL:
     case BINOP_DIV:
       if (type1->type == TYP_INTLIT) {
         switch (type2->type) {
@@ -582,6 +582,49 @@ typeStmt(Scope *scope, Stmt *stmt) {
                               stringOfType(entry->type),
                               stringOfType(stmt->assign.value->typeExpr)),
                      stmt->assign.value->start, stmt->assign.value->end);
+          printErrors();
+        }
+        break;
+      }
+    case STMT_COMPOUND_ASSIGN:
+      {
+        typeExpression(scope, stmt->compound_assign.value);
+
+        TypedEntry *entry = getLValEntry(stmt->compound_assign.lval);
+
+        Type *type;
+
+        if (stmt->compound_assign.lval->type == LVAL_VAR) {
+          type = coerceAssignment(entry->type, stmt->compound_assign.value->typeExpr);
+          if (!entry->isMut) {
+            queueError(msprintf("Cannot assign to immutable variable '%.*s'",
+                                (int)getLValSym(stmt->compound_assign.lval).len,
+                                getLValSym(stmt->compound_assign.lval).text),
+                       stmt->start, stmt->end);
+            return;
+          }
+        } else if (stmt->compound_assign.lval->type == LVAL_DEREF) {
+          if (entry->type->type != TYP_PTR) {
+            queueError("Cannot assign to address of non-pointer variable",
+                       stmt->start, stmt->end);
+            printErrors();
+          }
+          if (!entry->type->ptr.mut) {
+            queueError("Cannot assign to immutable pointer to variable",
+                       stmt->start, stmt->end);
+          }
+          type = coerceBinop(stmt->compound_assign.op, entry->type->ptr.type,
+                                  stmt->compound_assign.value->typeExpr);
+        } else {
+          assert(false);
+          exit(1);
+        }
+
+        if (type == NULL) {
+          queueError(msprintf("Cannot coerce type %s to %s",
+                              stringOfType(entry->type),
+                              stringOfType(stmt->compound_assign.value->typeExpr)),
+                     stmt->compound_assign.value->start, stmt->compound_assign.value->end);
           printErrors();
         }
         break;

@@ -65,6 +65,9 @@ checkStackStmt(Scope *scope, Stmt *stmt) {
     case STMT_ASSIGN:
       checkStackExpr(scope, stmt->assign.value);
       break;
+    case STMT_COMPOUND_ASSIGN:
+      checkStackExpr(scope, stmt->compound_assign.value);
+      break;
     case STMT_IF:
       {
         checkStackExpr(scope, stmt->if_block.cond);

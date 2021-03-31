@@ -40,6 +40,18 @@ printToken(Token tok) {
     case TOK_DO:
       printf("TOK_DO");
       break;
+    case TOK_PLUS_EQ:
+      printf("TOK_PLUS_EQ");
+      break;
+    case TOK_MINUS_EQ:
+      printf("TOK_MINUS_EQ");
+      break;
+    case TOK_STAR_EQ:
+      printf("TOK_STAR_EQ");
+      break;
+    case TOK_SLASH_EQ:
+      printf("TOK_SLASH_EQ");
+      break;
     case TOK_ELSE:
       printf("TOK_ELSE");
       break;
@@ -234,7 +246,7 @@ printBinopOp(int op) {
     case BINOP_SUB:
       printf("-");
       break;
-    case BINOP_MULT:
+    case BINOP_MUL:
       printf("*");
       break;
     case BINOP_DIV:
@@ -360,7 +372,14 @@ printStmt(Stmt *stmt) {
       printLVal(stmt->assign.lval);
       printf(" = ");
       printExpr(stmt->assign.value);
-      printf(")");
+      break;
+    case STMT_COMPOUND_ASSIGN:
+      printf("STMT_COMPOUND_ASSIGN: ");
+      printLVal(stmt->compound_assign.lval);
+      printf(" ");
+      printBinopOp(stmt->compound_assign.op);
+      printf("= ");
+      printExpr(stmt->compound_assign.value);
       break;
     case STMT_IF:
       {

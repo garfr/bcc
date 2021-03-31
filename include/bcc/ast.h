@@ -80,7 +80,7 @@ typedef struct Expr {
       enum {
         BINOP_ADD,
         BINOP_SUB,
-        BINOP_MULT,
+        BINOP_MUL,
         BINOP_DIV,
         BINOP_EQUAL,
         BINOP_NOTEQUAL,
@@ -193,12 +193,7 @@ typedef struct Stmt {
     struct {
       LVal *lval;
       Expr *value;
-      enum {
-        ASSIGN_ADD,
-        ASSIGN_SUB,
-        ASSIGN_MUL,
-        ASSIGN_DIV,
-      } op;
+      int op;
     } compound_assign;
 
     Expr *returnExp;

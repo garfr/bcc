@@ -148,7 +148,7 @@ generateBinaryOp(int op, Type *type) {
       return "add";
     case BINOP_SUB:
       return "sub";
-    case BINOP_MULT:
+    case BINOP_MUL:
       return "mul";
     case BINOP_DIV:
       switch (type->type) {
@@ -514,11 +514,11 @@ generateBinOpExpr(Scope *scope, Expr *expr, bool *needsCopy) {
   char *expr1;
   if (needsOwnInstruction(expr->binop.exp1)) {
     if (*needsCopy) {
-      fprintf(context.out, "\t%%v%d =%s %s\n", loc1,
+      fprintf(context.out, "\t%%v%d =%s copy %s\n", loc1,
               generateType(expr->typeExpr), tempexpr1);
 
     } else {
-      fprintf(context.out, "\t%%v%d =%s copy %s\n", loc1,
+      fprintf(context.out, "\t%%v%d =%s %s\n", loc1,
               generateType(expr->typeExpr), tempexpr1);
     }
     expr1 = msprintf("%%v%d", loc1);
@@ -656,6 +656,67 @@ generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
 }
 
 static void
+generateCompoundAssign(Scope *scope, Stmt* stmt, bool *needsCopy) {
+  if (stmt->compound_assign.lval->type == LVAL_VAR) {
+
+    TypedEntry *entry = stmt->compound_assign.lval->var.entry->data;
+    char *expr = generateExpr(scope, stmt->compound_assign.value, needsCopy);
+    if (entry->onStack) {
+      int loc1 = getNewNum(); // Stores the old value from the stack
+      int loc2 = getNewNum(); // Stores the expression 
+      int loc3 = getNewNum(); // Stores the new value, that will be stored back into the stack
+
+      // Fetch the value from the stack
+      fprintf(context.out, "\t%%v%d =%s %s %%%.*s\n", 
+          loc1, 
+          generateType(entry->type), pickLoadInst(entry->type), 
+          (int) stmt->compound_assign.lval->var.sym.len, 
+          stmt->compound_assign.lval->var.sym.text);
+
+      // Calculate the right hand side of the statement
+      if (*needsCopy) {
+        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc2, 
+            generateType(stmt->compound_assign.value->typeExpr), expr);
+      }
+      else {
+        fprintf(context.out, "\t%%v%d =%s %s\n", loc2, 
+            generateType(stmt->compound_assign.value->typeExpr), expr);
+      }
+
+      fprintf(context.out, "\t%%v%d =%s %s %%v%d, %%v%d\n", loc3, 
+          generateType(entry->type), 
+          generateBinaryOp(stmt->compound_assign.op, entry->type), loc1, loc2);
+
+      fprintf(context.out, "\t%s %%v%d, %%%.*s\n", 
+          pickStoreInst(entry->type), loc3, 
+          (int) stmt->compound_assign.lval->var.sym.len, 
+          stmt->compound_assign.lval->var.sym.text);
+    }
+    else {
+      int loc1 = getNewNum(); // This stores the right hand expression 
+
+      // Calculate the right hand side of the statement
+      if (*needsCopy) {
+        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc1, generateType(stmt->compound_assign.value->typeExpr), expr);
+      }
+      else {
+        fprintf(context.out, "\t%%v%d =%s %s\n", loc1, generateType(stmt->compound_assign.value->typeExpr), expr);
+      }
+
+      fprintf(context.out, "\t%%%.*s =%s %s %%%.*s, %%v%d\n", (int) stmt->compound_assign.lval->var.sym.len, 
+          stmt->compound_assign.lval->var.sym.text, generateType(entry->type),
+          generateBinaryOp(stmt->compound_assign.op, entry->type),
+          (int) stmt->compound_assign.lval->var.sym.len, 
+          stmt->compound_assign.lval->var.sym.text,
+          loc1);
+    }
+  }
+  else {
+    assert(false);
+    exit(1);
+  }
+}
+static void
 generateAssign(Scope *scope, Stmt *stmt, bool *needsCopy) {
   if (stmt->assign.lval->type == LVAL_VAR) {
     TypedEntry *entry = stmt->assign.lval->var.entry->data;
@@ -787,6 +848,9 @@ generateStatement(Scope *scope, Stmt *stmt) {
     case STMT_ASSIGN:
       generateAssign(scope, stmt, &needsCopy);
       return;
+    case STMT_COMPOUND_ASSIGN:
+      generateCompoundAssign(scope, stmt, &needsCopy);
+      return;
     case STMT_RETURN:
       {
         if (stmt->returnExp == NULL) {
@@ -824,16 +888,17 @@ generateStatement(Scope *scope, Stmt *stmt) {
       }
     case STMT_WHILE:
       {
-        char *expr = generateExpr(scope, stmt->while_block.cond, &needsCopy);
-        int value1 = getNewNum();
-
         int loc1, loc2, loc3;
 
         loc1 = getNewNum();
         loc2 = getNewNum();
         loc3 = getNewNum();
-
         fprintf(context.out, "@loc%d\n", loc1);
+
+        char *expr = generateExpr(scope, stmt->while_block.cond, &needsCopy);
+        int value1 = getNewNum();
+
+
 
         if (needsCopy) {
           fprintf(context.out, "\t%%v%d =%s copy %s\n", value1,

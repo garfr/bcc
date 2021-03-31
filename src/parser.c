@@ -468,7 +468,7 @@ parseBinop(Parser *parser) {
     case TOK_MINUS:
       return BINOP_SUB;
     case TOK_STAR:
-      return BINOP_MULT;
+      return BINOP_MUL;
     case TOK_SLASH:
       return BINOP_DIV;
     case TOK_DOUBLEEQUAL:
@@ -796,14 +796,30 @@ parseCompoundAssign(Parser *parser, LVal *lval, int type) {
     printErrors();
   }
 
-  Stmt* ret = calloc(1, sizeof(Stmt));
+  Stmt* ret = stmtFromTwoPoints(lval->start, finalTok.end, STMT_COMPOUND_ASSIGN);
+
+  HashEntry *entry = findInScope(parser->currentScope, getSymbolLVal(lval));
+
+  if (entry == NULL) {
+    queueError(msprintf("Cannot find variable: '%.*s' in scope",
+                        getSymbolLVal(lval).len,
+                        (char *)getSymbolLVal(lval).text),
+               ret->start, ret->end);
+    printErrors();
+  }
+
+  if (lval->type == LVAL_VAR) {
+    lval->var.entry = entry;
+  } else if (lval->type == LVAL_DEREF) {
+    lval->deref.entry = entry;
+  } else {
+    assert(false);
+    exit(1);
+  }
 
   ret->compound_assign.lval = lval;
   ret->compound_assign.op = type;
   ret->compound_assign.value = expr;
-  ret->type = STMT_COMPOUND_ASSIGN;
-  ret->start = lval->start;
-  ret->end = expr->end;
 
   return ret;
 }
@@ -815,13 +831,13 @@ parseAssignment(Parser *parser) {
   Token equalTok = nextToken(parser->lex);
   switch (equalTok.type) {
     case TOK_PLUS_EQ:
-      return parseCompoundAssign(parser, lval, ASSIGN_ADD);
+      return parseCompoundAssign(parser, lval, BINOP_ADD);
     case TOK_MINUS_EQ:
-      return parseCompoundAssign(parser, lval, ASSIGN_SUB);
+      return parseCompoundAssign(parser, lval, BINOP_SUB);
     case TOK_STAR_EQ:
-      return parseCompoundAssign(parser, lval, ASSIGN_MUL);
+      return parseCompoundAssign(parser, lval, BINOP_MUL);
     case TOK_SLASH_EQ:
-      return parseCompoundAssign(parser, lval, ASSIGN_DIV);
+      return parseCompoundAssign(parser, lval, BINOP_DIV);
     case TOK_EQUAL:
       break;
     default:
@@ -839,6 +855,7 @@ parseAssignment(Parser *parser) {
         semiTok.start, semiTok.end);
     printErrors();
   }
+
   Stmt *ret = stmtFromTwoPoints(lval->start, semiTok.end, STMT_ASSIGN);
 
   HashEntry *entry = findInScope(parser->currentScope, getSymbolLVal(lval));

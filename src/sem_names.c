@@ -64,6 +64,9 @@ resolveStmt(Scope *scope, Stmt *stmt) {
     case STMT_ASSIGN:
       resolveExpr(scope, stmt->assign.value);
       break;
+    case STMT_COMPOUND_ASSIGN:
+      resolveExpr(scope, stmt->compound_assign.value);
+      break;
     case STMT_IF:
       {
 
