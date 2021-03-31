@@ -202,9 +202,21 @@ getToken(Lexer *lex) {
             continue;
           }
           switch (c) {
+            case '+':
+              lex->endIdx++;
+              lex->state = LEX_PLUS;
+              continue;
             case '-':
               lex->endIdx++;
               lex->state = LEX_DASH;
+              continue;
+            case '*':
+              lex->endIdx++;
+              lex->state = LEX_STAR;
+              continue;
+            case '/':
+              lex->endIdx++;
+              lex->state = LEX_SLASH;
               continue;
             case '\'':
               lex->endIdx++;
@@ -236,10 +248,6 @@ getToken(Lexer *lex) {
               continue;
             case ';':
               return makeTokenInplace(lex, TOK_SEMICOLON);
-            case '+':
-              return makeTokenInplace(lex, TOK_PLUS);
-            case '*':
-              return makeTokenInplace(lex, TOK_STAR);
             case ')':
               return makeTokenInplace(lex, TOK_RPAREN);
             case '(':
@@ -256,8 +264,6 @@ getToken(Lexer *lex) {
               return makeTokenInplace(lex, TOK_LBRACKET);
             case '}':
               return makeTokenInplace(lex, TOK_RBRACKET);
-            case '/':
-              return makeTokenInplace(lex, TOK_SLASH);
             default:
               {
                 char *buffer = msprintf("Unexpected character: '%c'", c);
@@ -267,6 +273,17 @@ getToken(Lexer *lex) {
                 continue;
               }
           }
+        }
+      case LEX_PLUS:
+        {
+          if (lex->endIdx >= lex->bufferLen) {
+            return makeTokenBehind(lex, TOK_PLUS);
+          }
+          unsigned char c = lex->buffer[lex->endIdx];
+          if (c == '=') {
+            return makeTokenInplace(lex, TOK_PLUS_EQ);
+          }
+          return makeTokenBehind(lex, TOK_PLUS);
         }
       case LEX_DASH:
         {
@@ -282,7 +299,32 @@ getToken(Lexer *lex) {
           if (c == '>') {
             return makeTokenInplace(lex, TOK_ARROW);
           }
+          if (c == '=') {
+            return makeTokenInplace(lex, TOK_MINUS_EQ);
+          }
           return makeTokenBehind(lex, TOK_MINUS);
+        }
+      case LEX_STAR:
+        {
+          if (lex->endIdx >= lex->bufferLen) {
+            return makeTokenBehind(lex, TOK_STAR);
+          }
+          unsigned char c = lex->buffer[lex->endIdx];
+          if (c == '=') {
+            return makeTokenInplace(lex, TOK_STAR_EQ);
+          }
+          return makeTokenBehind(lex, TOK_STAR);
+        }
+      case LEX_SLASH:
+        {
+          if (lex->endIdx >= lex->bufferLen) {
+            return makeTokenBehind(lex, TOK_SLASH);
+          }
+          unsigned char c = lex->buffer[lex->endIdx];
+          if (c == '=') {
+            return makeTokenInplace(lex, TOK_SLASH_EQ);
+          }
+          return makeTokenBehind(lex, TOK_SLASH);
         }
       case LEX_LANGLE:
         {
