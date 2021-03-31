@@ -99,6 +99,47 @@ getNewNum() {
   return cnt++;
 }
 
+#define SMALL_TYPES                                                            \
+  TYP_S8:                                                                      \
+  case TYP_U8:                                                                 \
+  case TYP_S16:                                                                \
+  case TYP_U16:                                                                \
+  case TYP_S32:                                                                \
+  case TYP_U32:                                                                \
+  case TYP_BOOL:                                                               \
+  case TYP_INTLIT:                                                             \
+  case TYP_CHAR:                                                               \
+  case TYP_VOID
+
+#define BIG_TYPES                                                              \
+  TYP_S64:                                                                     \
+  case TYP_U64:                                                                \
+  case TYP_FUN:                                                                \
+  case TYP_RECORD:                                                             \
+  case TYP_PTR
+
+#define SIGNED_SMALL_TYPES                                                     \
+  TYP_S8:                                                                      \
+  case TYP_S16:                                                                \
+  case TYP_S32:                                                                \
+  case TYP_INTLIT
+
+#define UNSIGNED_SMALL_TYPES                                                   \
+  TYP_U8:                                                                      \
+  case TYP_U16:                                                                \
+  case TYP_U32:                                                                \
+  case TYP_BOOL:                                                               \
+  case TYP_CHAR:                                                               \
+  case TYP_VOID
+
+#define SIGNED_BIG_TYPES TYP_S64
+
+#define UNSIGNED_BIG_TYPES                                                     \
+  TYP_U64:                                                                     \
+  case TYP_FUN:                                                                \
+  case TYP_RECORD:                                                             \
+  case TYP_PTR
+
 /* Picks the correct binary op for a type */
 static char *
 generateBinaryOp(int op, Type *type) {
@@ -127,22 +168,9 @@ generateBinaryOp(int op, Type *type) {
       }
     case BINOP_EQUAL:
       switch (type->type) {
-        case TYP_S8:
-        case TYP_U8:
-        case TYP_S16:
-        case TYP_U16:
-        case TYP_S32:
-        case TYP_U32:
-        case TYP_BOOL:
-        case TYP_INTLIT:
-        case TYP_CHAR:
-        case TYP_VOID:
+        case SMALL_TYPES:
           return "ceqw";
-        case TYP_S64:
-        case TYP_U64:
-        case TYP_FUN:
-        case TYP_RECORD:
-        case TYP_PTR:
+        case BIG_TYPES:
           return "ceql";
         case TYP_BINDING:
           return generateBinaryOp(op, type->typeEntry->data);
@@ -150,38 +178,80 @@ generateBinaryOp(int op, Type *type) {
       break;
     case BINOP_NOTEQUAL:
       switch (type->type) {
-        case TYP_S8:
-        case TYP_U8:
-        case TYP_S16:
-        case TYP_U16:
-        case TYP_S32:
-        case TYP_U32:
-        case TYP_BOOL:
-        case TYP_INTLIT:
-        case TYP_CHAR:
-        case TYP_VOID:
+        case SMALL_TYPES:
           return "cnew";
-        case TYP_S64:
-        case TYP_U64:
-        case TYP_FUN:
-        case TYP_RECORD:
-        case TYP_PTR:
+        case BIG_TYPES:
           return "cnel";
         case TYP_BINDING:
           return generateBinaryOp(op, type->typeEntry->data);
       }
       break;
-
+    case BINOP_LESS:
+      switch (type->type) {
+        case SIGNED_SMALL_TYPES:
+          return "csltw";
+        case UNSIGNED_SMALL_TYPES:
+          return "csltw";
+        case SIGNED_BIG_TYPES:
+          return "csltl";
+        case UNSIGNED_BIG_TYPES:
+          return "csltl";
+        case TYP_BINDING:
+          return generateBinaryOp(op, type->typeEntry->data);
+      }
+      break;
+    case BINOP_GREAT:
+      switch (type->type) {
+        case SIGNED_SMALL_TYPES:
+          return "csgtw";
+        case UNSIGNED_SMALL_TYPES:
+          return "csgtw";
+        case SIGNED_BIG_TYPES:
+          return "csgtl";
+        case UNSIGNED_BIG_TYPES:
+          return "csgtl";
+        case TYP_BINDING:
+          return generateBinaryOp(op, type->typeEntry->data);
+      }
+      break;
+    case BINOP_LESS_EQ:
+      switch (type->type) {
+        case SIGNED_SMALL_TYPES:
+          return "cslew";
+        case UNSIGNED_SMALL_TYPES:
+          return "cslew";
+        case SIGNED_BIG_TYPES:
+          return "cslel";
+        case UNSIGNED_BIG_TYPES:
+          return "cslel";
+        case TYP_BINDING:
+          return generateBinaryOp(op, type->typeEntry->data);
+      }
+      break;
+    case BINOP_GREAT_EQ:
+      switch (type->type) {
+        case SIGNED_SMALL_TYPES:
+          return "csgew";
+        case UNSIGNED_SMALL_TYPES:
+          return "csgew";
+        case SIGNED_BIG_TYPES:
+          return "csgel";
+        case UNSIGNED_BIG_TYPES:
+          return "csgel";
+        case TYP_BINDING:
+          return generateBinaryOp(op, type->typeEntry->data);
+      }
+      break;
     default:
-      printf("Invalid binary operation.\n");
+      assert(false);
       exit(1);
   }
   return NULL;
 }
 
-/* Returns true if the given expression needs its own instruction in the IR, or
- * false if the given instruction can be placed inline. The needsCopy parameter
- * should be used to determine if a copy instruction is needed */
+/* Returns true if the given expression needs its own instruction in the IR,
+ * or false if the given instruction can be placed inline. The needsCopy
+ * parameter should be used to determine if a copy instruction is needed */
 static bool
 needsOwnInstruction(Expr *exp) {
   switch (exp->type) {
@@ -202,8 +272,8 @@ needsOwnInstruction(Expr *exp) {
   }
 }
 
-/* TODO: Move this to a different file for semantic analysis, as this should not
- * be in the codegeneration phase */
+/* TODO: Move this to a different file for semantic analysis, as this should
+ * not be in the codegeneration phase */
 static int
 translateCharacter(Symbol sym) {
   if (sym.len >= 1) {

@@ -135,6 +135,10 @@ coerceBinop(int op, Type *type1, Type *type2) {
       return NULL;
     case BINOP_EQUAL:
     case BINOP_NOTEQUAL:
+    case BINOP_LESS:
+    case BINOP_LESS_EQ:
+    case BINOP_GREAT:
+    case BINOP_GREAT_EQ:
       if (type1->type == TYP_INTLIT) {
         switch (type2->type) {
           case TYP_S8:
