@@ -17,7 +17,11 @@ Currently, QBE only works as an executable and has no library interface. Because
 
 ``./configure``
 
-``make all``
+``meson setup build``
+
+``cd build/``
+
+``ninja``
 
 ## Language Examples
 
