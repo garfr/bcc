@@ -219,6 +219,14 @@ getToken(Lexer *lex) {
               lex->endIdx++;
               lex->state = LEX_EQUAL;
               continue;
+            case '<':
+              lex->endIdx++;
+              lex->state = LEX_LANGLE;
+              continue;
+            case '>':
+              lex->endIdx++;
+              lex->state = LEX_RANGLE;
+              continue;
             case '!':
               lex->endIdx++;
               lex->state = LEX_EXCLAMATION;
@@ -275,6 +283,28 @@ getToken(Lexer *lex) {
             return makeTokenInplace(lex, TOK_ARROW);
           }
           return makeTokenBehind(lex, TOK_MINUS);
+        }
+      case LEX_LANGLE:
+        {
+          if (lex->endIdx >= lex->bufferLen) {
+            return makeTokenBehind(lex, TOK_LANGLE);
+          }
+          unsigned char c = lex->buffer[lex->endIdx];
+          if (c == '=') {
+            return makeTokenInplace(lex, TOK_LANGLE_EQ);
+          }
+          return makeTokenBehind(lex, TOK_LANGLE);
+        }
+      case LEX_RANGLE:
+        {
+          if (lex->endIdx >= lex->bufferLen) {
+            return makeTokenBehind(lex, TOK_LANGLE);
+          }
+          unsigned char c = lex->buffer[lex->endIdx];
+          if (c == '=') {
+            return makeTokenInplace(lex, TOK_RANGLE_EQ);
+          }
+          return makeTokenBehind(lex, TOK_RANGLE);
         }
       case LEX_EQUAL:
         {

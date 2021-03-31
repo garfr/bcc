@@ -84,6 +84,10 @@ typedef struct Expr {
         BINOP_DIV,
         BINOP_EQUAL,
         BINOP_NOTEQUAL,
+        BINOP_LESS,
+        BINOP_GREAT,
+        BINOP_LESS_EQ,
+        BINOP_GREAT_EQ,
         BINOP_AND,
         BINOP_OR,
       } op;

@@ -55,6 +55,18 @@ printToken(Token tok) {
     case TOK_END:
       printf("TOK_END");
       break;
+    case TOK_LANGLE:
+      printf("TOK_LANGLE");
+      break;
+    case TOK_RANGLE:
+      printf("TOK_RANGLE");
+      break;
+    case TOK_LANGLE_EQ:
+      printf("TOK_LANGLE_EQ");
+      break;
+    case TOK_RANGLE_EQ:
+      printf("TOK_RANGLE_EQ");
+      break;
     case TOK_MUT:
       printf("TOK_MUT");
       break;

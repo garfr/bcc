@@ -48,6 +48,10 @@ enum TokenType {
   TOK_LPAREN,
   TOK_RPAREN,
   TOK_LBRACKET,
+  TOK_LANGLE,
+  TOK_RANGLE,
+  TOK_LANGLE_EQ,
+  TOK_RANGLE_EQ,
   TOK_RBRACKET,
   TOK_MINUS,
   TOK_STAR,
@@ -82,6 +86,8 @@ enum LexerState {
   LEX_SINGLE_QUOTE,
   LEX_EQUAL,
   LEX_EXCLAMATION,
+  LEX_LANGLE,
+  LEX_RANGLE,
 };
 
 typedef struct {
