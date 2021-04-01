@@ -10,6 +10,9 @@ printToken(Token tok) {
     case TOK_LET:
       printf("TOK_LET");
       break;
+    case TOK_UNDERLINE:
+      printf("TOK_UNDERLINE");
+      break;
     case TOK_AT:
       printf("TOK_AT");
       break;
@@ -124,14 +127,20 @@ printToken(Token tok) {
     case TOK_RPAREN:
       printf("TOK_RPAREN");
       break;
-    case TOK_LBRACKET:
-      printf("TOK_LBRACKET");
+    case TOK_LCURLY:
+      printf("TOK_LCURLY");
+      break;
+    case TOK_RCURLY:
+      printf("TOK_RCURLY");
+      break;
+    case TOK_COMMA:
+      printf("TOK_COMMA");
       break;
     case TOK_RBRACKET:
       printf("TOK_RBRACKET");
       break;
-    case TOK_COMMA:
-      printf("TOK_COMMA");
+    case TOK_LBRACKET:
+      printf("TOK_LBRACKET");
       break;
     case TOK_ARROW:
       printf("TOK_ARROW");
@@ -208,6 +217,10 @@ printType(Type *type) {
       }
       printType(type->ptr.type);
       break;
+    case TYP_ARRAY:
+      printf("[%ld]", type->array.size);
+      printType(type->array.type);
+      break;
     case TYP_INTLIT:
       printf("TYP_INTLIT");
       break;
@@ -270,6 +283,18 @@ printBinopOp(int op) {
 void
 printExpr(Expr *exp) {
   switch (exp->type) {
+    case EXP_ARRAY:
+      {
+        printf("[");
+
+        for (size_t i = 0; i < exp->array.items->numItems; i++) {
+          Expr *tempExpr = *((Expr **)indexVector(exp->array.items, i));
+          printExpr(tempExpr);
+          printf(", ");
+        }
+        printf("]");
+        break;
+      }
     case EXP_INT:
       printf("EXP_INT: '%.*s' : ", (int)exp->intlit.len, exp->intlit.text);
       break;

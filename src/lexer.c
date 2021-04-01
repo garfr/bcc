@@ -146,6 +146,7 @@ newlineNeeded(Lexer *lex) {
     case TOK_INT:
     case TOK_SYM:
     case TOK_RPAREN:
+    case TOK_RCURLY:
     case TOK_RBRACKET:
     case TOK_RETURN:
     case TOK_FALSE:
@@ -258,11 +259,17 @@ getToken(Lexer *lex) {
               return makeTokenInplace(lex, TOK_PERIOD);
             case '&':
               return makeTokenInplace(lex, TOK_AMP);
+            case '_':
+              return makeTokenInplace(lex, TOK_UNDERLINE);
             case '@':
               return makeTokenInplace(lex, TOK_AT);
             case '{':
-              return makeTokenInplace(lex, TOK_LBRACKET);
+              return makeTokenInplace(lex, TOK_LCURLY);
             case '}':
+              return makeTokenInplace(lex, TOK_RCURLY);
+            case '[':
+              return makeTokenInplace(lex, TOK_LBRACKET);
+            case ']':
               return makeTokenInplace(lex, TOK_RBRACKET);
             default:
               {
