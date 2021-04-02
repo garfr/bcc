@@ -634,6 +634,45 @@ generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
     case EXP_CHAR:
       *needsCopy = true;
       return msprintf("%d", translateCharacter(expr->character));
+    case EXP_INDEX:
+      {
+        char *indexExpr = generateExpr(scope, expr->index.indexVal, needsCopy);
+        int tempLoc = getNewNum();
+        if (*needsCopy) {
+          fprintf(context.out, "\t%%v%d =l copy %s\n", tempLoc, indexExpr);
+        } else {
+          fprintf(context.out, "\t%%v%d =l %s\n", tempLoc, indexExpr);
+        }
+
+        Type *itemType;
+        switch (expr->index.lval->typeExpr->type) {
+          case TYP_ARRAY:
+            itemType = expr->index.lval->array.type;
+            break;
+          default:
+            assert(false);
+            exit(1);
+        }
+
+        fprintf(context.out, "\t%%v%d =l mul %%v%d, %ld\n", tempLoc, tempLoc,
+                calculateSize(itemType));
+
+        char *lval = generateExpr(scope, expr->index.indexVal, needsCopy);
+
+        int baseLoc = getNewNum();
+        if (*needsCopy) {
+          fprintf(context.out, "\t%%v%d =l copy %s\n", baseLoc, lval);
+        } else {
+          fprintf(context.out, "\t%%v%d =l %s\n", baseLoc, lval);
+        }
+
+        // Get the real index into tempLoc
+        fprintf(context.out, "\t%%v%d =l add %%v%d, %%v%d\n", tempLoc, baseLoc,
+                tempLoc);
+
+        *needsCopy = true;
+        return msprintf("%s %%v%d", pickLoadInst(itemType), tempLoc);
+      }
     case EXP_ADDROF:
       {
         if (expr->addr.expr->type == EXP_VAR) {

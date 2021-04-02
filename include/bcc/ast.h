@@ -71,6 +71,7 @@ typedef struct Expr {
     EXP_FUNCALL,
     EXP_BOOL,
     EXP_ARRAY,
+    EXP_INDEX,
     EXP_RECORDLIT
   } type;
 
@@ -104,6 +105,11 @@ typedef struct Expr {
       struct Expr *expr;
       bool mut;
     } addr;
+
+    struct {
+      struct Expr *lval;
+      struct Expr *indexVal;
+    } index;
 
     struct Expr *deref;
     struct {

@@ -305,6 +305,13 @@ printExpr(Expr *exp) {
     case EXP_VAR:
       printf("EXP_VAR: '%.*s'", (int)exp->var->id.len, exp->var->id.text);
       break;
+    case EXP_INDEX:
+      printf("EXP_INDEX: ");
+      printExpr(exp->index.lval);
+      printf("[");
+      printExpr(exp->index.indexVal);
+      printf("]");
+      break;
     case EXP_ADDROF:
       if (exp->addr.mut) {
         printf("EXP_ADDROF: &mut");

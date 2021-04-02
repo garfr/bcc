@@ -32,6 +32,12 @@ checkStackExpr(Scope *scope, Expr *exp) {
         }
         break;
       }
+    case EXP_INDEX:
+      {
+        checkStackExpr(scope, exp->index.indexVal);
+        checkStackExpr(scope, exp->index.lval);
+        break;
+      }
     case EXP_FUNCALL:
       {
         for (size_t i = 0; i < exp->funcall.arguments->numItems; i++) {

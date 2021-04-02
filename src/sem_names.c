@@ -38,6 +38,12 @@ resolveExpr(Scope *scope, Expr *exp) {
         }
         break;
       }
+    case EXP_INDEX:
+      {
+        resolveExpr(scope, exp->index.indexVal);
+        resolveExpr(scope, exp->index.lval);
+        break;
+      }
     case EXP_ADDROF:
       resolveExpr(scope, exp->addr.expr);
       break;

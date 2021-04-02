@@ -302,6 +302,25 @@ typeExpression(Scope *scope, Expr *exp) {
         }
       }
       break;
+    case EXP_INDEX:
+      {
+        typeExpression(scope, exp->index.lval);
+        typeExpression(scope, exp->index.indexVal);
+
+        if (exp->index.indexVal->typeExpr->type != TYP_U64) {
+          queueError("Only 'u64' can be used to index arrays and slices",
+                     exp->index.indexVal->start, exp->index.indexVal->end);
+        }
+
+        int type = exp->index.lval->typeExpr->type;
+        if (type != TYP_ARRAY) {
+          queueError("You can only index arrays", exp->index.lval->start,
+                     exp->index.lval->end);
+          printErrors();
+        }
+
+        break;
+      }
     case EXP_ARRAY:
       {
         if (exp->array.items->numItems > (size_t)exp->array.type->array.size) {
