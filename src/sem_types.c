@@ -13,6 +13,7 @@
 static Type *IntegerLit = &(Type){.type = TYP_INTLIT, {}};
 static Type *BooleanLit = &(Type){.type = TYP_BOOL, {}};
 static Type *CharLit = &(Type){.type = TYP_CHAR, {}};
+static Type *U64Lit = &(Type){.type = TYP_U64, {}};
 
 /* This is only needed because the current error handling system does not
  * allow you to just pass a type and have the error printer call printType
@@ -307,7 +308,7 @@ typeExpression(Scope *scope, Expr *exp) {
         typeExpression(scope, exp->index.lval);
         typeExpression(scope, exp->index.indexVal);
 
-        if (exp->index.indexVal->typeExpr->type != TYP_U64) {
+        if (coerceAssignment(U64Lit, exp->index.indexVal->typeExpr) == NULL) {
           queueError("Only 'u64' can be used to index arrays and slices",
                      exp->index.indexVal->start, exp->index.indexVal->end);
         }
@@ -319,6 +320,7 @@ typeExpression(Scope *scope, Expr *exp) {
           printErrors();
         }
 
+        exp->typeExpr = exp->index.lval->typeExpr->array.type;
         break;
       }
     case EXP_ARRAY:

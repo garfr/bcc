@@ -280,9 +280,11 @@ needsOwnInstruction(Expr *exp) {
     case EXP_RECORDLIT:
     case EXP_ADDROF:
     case EXP_DEREF:
+    case EXP_INDEX:
+    case EXP_ARRAY:
       return true;
     default:
-      printf("ERROR: Unexpected exp enum: %d\n", exp->type);
+      assert(false);
       exit(1);
   }
 }
@@ -647,7 +649,7 @@ generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
         Type *itemType;
         switch (expr->index.lval->typeExpr->type) {
           case TYP_ARRAY:
-            itemType = expr->index.lval->array.type;
+            itemType = expr->index.lval->typeExpr->array.type;
             break;
           default:
             assert(false);
@@ -657,7 +659,7 @@ generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
         fprintf(context.out, "\t%%v%d =l mul %%v%d, %ld\n", tempLoc, tempLoc,
                 calculateSize(itemType));
 
-        char *lval = generateExpr(scope, expr->index.indexVal, needsCopy);
+        char *lval = generateExpr(scope, expr->index.lval, needsCopy);
 
         int baseLoc = getNewNum();
         if (*needsCopy) {
@@ -670,7 +672,7 @@ generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
         fprintf(context.out, "\t%%v%d =l add %%v%d, %%v%d\n", tempLoc, baseLoc,
                 tempLoc);
 
-        *needsCopy = true;
+        *needsCopy = false;
         return msprintf("%s %%v%d", pickLoadInst(itemType), tempLoc);
       }
     case EXP_ADDROF:

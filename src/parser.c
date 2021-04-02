@@ -527,9 +527,26 @@ parsePrimary(Parser *parser) {
             /* Must fail */
             printErrors();
           }
-
           ret->var = entry;
           ret->typeExpr = NULL;
+
+          while (peekToken(parser->lex).type == TOK_LBRACKET) {
+            nextToken(parser->lex);
+            Expr *innerExpr = parseExpr(parser);
+            Token endIndexTok = nextToken(parser->lex);
+            if (endIndexTok.type != TOK_RBRACKET) {
+              queueError("Expected ']' after expression in array index",
+                         endIndexTok.start, endIndexTok.end);
+              printErrors();
+            }
+
+            Expr *newRet =
+                exprFromTwoPoints(ret->start, endIndexTok.end, EXP_INDEX);
+            newRet->index.lval = ret;
+            newRet->index.indexVal = innerExpr;
+            ret = newRet;
+          }
+
           return ret;
       }
     case TOK_FALSE:
