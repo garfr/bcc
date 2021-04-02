@@ -170,7 +170,7 @@ parseType(Parser *parser) {
       {
         // Array/slice try
         Token numToken = nextToken(parser->lex);
-        if (numToken.type == TOK_INT) {
+        if (numToken.type == TOK_INT || numToken.type == TOK_UNDERLINE) {
           // Must be an array type
           Token rBracketTok = nextToken(parser->lex);
           if (rBracketTok.type != TOK_RBRACKET) {
@@ -181,10 +181,14 @@ parseType(Parser *parser) {
 
           Type *arrayType = parseType(parser);
           Type *ret = calloc(1, sizeof(Type));
-          if (!symbolToInt(numToken.intnum, &ret->array.size)) {
-            queueError("Invalid size of array", rBracketTok.start,
-                       rBracketTok.end);
-            printErrors();
+          if (numToken.type == TOK_INT) {
+            if (!symbolToInt(numToken.intnum, &ret->array.size)) {
+              queueError("Invalid size of array", rBracketTok.start,
+                         rBracketTok.end);
+              printErrors();
+            }
+          } else {
+            ret->array.size = -1;
           }
           ret->array.type = arrayType;
           if (ret->array.type == NULL) {
@@ -462,6 +466,11 @@ parseArrayLit(Parser *parser) {
       break;
     }
   }
+
+  if (arrayType->array.size == -1) {
+    arrayType->array.size = items->numItems;
+  }
+
   Token closingBracketTok = nextToken(parser->lex);
   if (closingBracketTok.type != TOK_RBRACKET) {
     queueError("Expected ']' after expression without command in array literal",
@@ -475,7 +484,6 @@ parseArrayLit(Parser *parser) {
   ret->type = EXP_ARRAY;
   ret->array.items = items;
   ret->array.type = arrayType;
-  ret->array.size = items->numItems;
   return ret;
 }
 

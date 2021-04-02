@@ -247,6 +247,19 @@ coerceAssignment(Type *type1, Type *type2) {
 
     return coerceAssignment(type1->ptr.type, type2->ptr.type);
   }
+  if (type1->type == TYP_ARRAY && type2->type == TYP_ARRAY) {
+    if (type1->array.size != type2->array.size) {
+      if (type1->array.size == -1) {
+        type1->array.size = type2->array.size; // Set the inferred type to what
+      } else {
+        return NULL;
+      }
+    }
+    if (coerceAssignment(type1->array.type, type2->array.type) == NULL) {
+      return NULL;
+    }
+  }
+
   if (type1->type == type2->type) {
     return type1;
   }
@@ -473,6 +486,13 @@ typeStmt(Scope *scope, Stmt *stmt) {
   switch (stmt->type) {
     /* This should have gotten typed before hand */
     case STMT_DEC:
+      if (stmt->dec.type->type == TYP_ARRAY) {
+        if (stmt->dec.type->array.size == -1) {
+          queueError("Cannot infer size of an array without assigning to it",
+                     stmt->start, stmt->end);
+          printErrors();
+        }
+      }
       break;
 
     case STMT_EXPR:

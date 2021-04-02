@@ -121,7 +121,6 @@ typedef struct Expr {
     struct {
       Vector *items; // Expr*
       Type *type;
-      int64_t size;
     } array;
   };
 } Expr;
