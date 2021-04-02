@@ -43,6 +43,9 @@ stringOfType(Type *type) {
       return "void";
     case TYP_BOOL:
       return "bool";
+    case TYP_ARRAY:
+      return msprintf("[%ld]%s", type->array.size,
+                      stringOfType(type->array.type));
     case TYP_PTR:
       if (type->ptr.mut) {
         return msprintf("&mut %s", stringOfType(type->ptr.type));
@@ -72,6 +75,9 @@ coerceBinop(int op, Type *type1, Type *type2) {
   assert(type1 != NULL);
   assert(type2 != NULL);
 
+  if (type1->type == TYP_ARRAY || type2->type == TYP_ARRAY) {
+    return NULL; // There are no binary ops with arrays
+  }
   if (type1->type == TYP_BINDING && type1->type == TYP_BINDING) {
     return coerceBinop(op, type1->typeEntry->data, type2->typeEntry->data);
   }
@@ -283,6 +289,36 @@ typeExpression(Scope *scope, Expr *exp) {
         }
       }
       break;
+    case EXP_ARRAY:
+      {
+        if (exp->array.items->numItems > (size_t)exp->array.type->array.size) {
+          queueError("Array literal is larger than the given array size",
+                     exp->start, exp->end);
+          printErrors();
+        } else if (exp->array.items->numItems <
+                   (size_t)exp->array.type->array.size) {
+          queueError("Not every item in array is initialized", exp->start,
+                     exp->end);
+          printErrors();
+        }
+
+        for (size_t i = 0; i < exp->array.items->numItems; i++) {
+          Expr *tempExpr = *((Expr **)indexVector(exp->array.items, i));
+          typeExpression(scope, tempExpr);
+          if (coerceAssignment(exp->array.type->array.type,
+                               tempExpr->typeExpr) == NULL) {
+            queueError(msprintf("Cannot coerce type '%s' to type '%s'",
+                                stringOfType(exp->array.type),
+                                stringOfType(tempExpr->typeExpr)),
+                       tempExpr->start, tempExpr->end);
+          }
+        }
+        if (errorsExist()) {
+          printErrors();
+        }
+        exp->typeExpr = exp->array.type;
+        break;
+      }
     case EXP_ADDROF:
       {
         if (exp->addr.expr->type != EXP_VAR) {
@@ -550,6 +586,11 @@ typeStmt(Scope *scope, Stmt *stmt) {
         TypedEntry *entry = getLValEntry(stmt->assign.lval);
 
         Type *type;
+        if (stmt->assign.value->type == EXP_ARRAY) {
+          queueError("Cannot assign a stack allocated array to an already "
+                     "initialized variable",
+                     stmt->start, stmt->end);
+        }
 
         if (stmt->assign.lval->type == LVAL_VAR) {
           type = coerceAssignment(entry->type, stmt->assign.value->typeExpr);
@@ -595,7 +636,8 @@ typeStmt(Scope *scope, Stmt *stmt) {
         Type *type;
 
         if (stmt->compound_assign.lval->type == LVAL_VAR) {
-          type = coerceAssignment(entry->type, stmt->compound_assign.value->typeExpr);
+          type = coerceAssignment(entry->type,
+                                  stmt->compound_assign.value->typeExpr);
           if (!entry->isMut) {
             queueError(msprintf("Cannot assign to immutable variable '%.*s'",
                                 (int)getLValSym(stmt->compound_assign.lval).len,
@@ -614,17 +656,18 @@ typeStmt(Scope *scope, Stmt *stmt) {
                        stmt->start, stmt->end);
           }
           type = coerceBinop(stmt->compound_assign.op, entry->type->ptr.type,
-                                  stmt->compound_assign.value->typeExpr);
+                             stmt->compound_assign.value->typeExpr);
         } else {
           assert(false);
           exit(1);
         }
 
         if (type == NULL) {
-          queueError(msprintf("Cannot coerce type %s to %s",
-                              stringOfType(entry->type),
-                              stringOfType(stmt->compound_assign.value->typeExpr)),
-                     stmt->compound_assign.value->start, stmt->compound_assign.value->end);
+          queueError(
+              msprintf("Cannot coerce type %s to %s", stringOfType(entry->type),
+                       stringOfType(stmt->compound_assign.value->typeExpr)),
+              stmt->compound_assign.value->start,
+              stmt->compound_assign.value->end);
           printErrors();
         }
         break;

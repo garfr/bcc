@@ -37,6 +37,7 @@ enum TokTypeBits {
   TOK_RETURN_BITS = 1 << 8,
   TOK_PERIOD_BITS = 1 << 9,
   TOK_DO_BITS = 1 << 10,
+  TOK_RBRACKET_BITS = 1 << 11,
 };
 
 /* Runs through tokens until a token passed in bitflags is reached, which is
@@ -59,6 +60,7 @@ continueUntil(Lexer *lex, int bitFlags) {
         (tok.type == TOK_LPAREN && bitFlags & TOK_LPAREN_BITS) ||
         (tok.type == TOK_PERIOD && bitFlags & TOK_PERIOD_BITS) ||
         (tok.type == TOK_DO && bitFlags & TOK_DO_BITS) ||
+        (tok.type == TOK_RBRACKET && bitFlags & TOK_RBRACKET_BITS) ||
         (tok.type == TOK_RETURN && bitFlags & TOK_RETURN_BITS)) {
       break;
     } else {
@@ -164,6 +166,43 @@ parseType(Parser *parser) {
         ret->ptr.type = nextType;
         return ret;
       }
+    case TOK_LBRACKET:
+      {
+        // Array/slice try
+        Token numToken = nextToken(parser->lex);
+        if (numToken.type == TOK_INT) {
+          // Must be an array type
+          Token rBracketTok = nextToken(parser->lex);
+          if (rBracketTok.type != TOK_RBRACKET) {
+            queueError("Expected ']' after size of array", rBracketTok.start,
+                       rBracketTok.end);
+            rBracketTok = continueUntil(parser->lex, TOK_RBRACKET_BITS);
+          }
+
+          Type *arrayType = parseType(parser);
+          Type *ret = calloc(1, sizeof(Type));
+          if (!symbolToInt(numToken.intnum, &ret->array.size)) {
+            queueError("Invalid size of array", rBracketTok.start,
+                       rBracketTok.end);
+            printErrors();
+          }
+          ret->array.type = arrayType;
+          if (ret->array.type == NULL) {
+            printf("WHATO\n");
+            exit(1);
+          }
+          ret->type = TYP_ARRAY;
+          return ret;
+        }
+        if (numToken.type == TOK_RBRACKET) {
+          // This is a slice
+
+          assert(false);
+          exit(1);
+        }
+      }
+      assert(false);
+      return NULL;
     case TOK_SYM:
       switch (tok.sym.text[0]) {
         case 's':
@@ -215,7 +254,8 @@ parseType(Parser *parser) {
             return ret;
           }
       }
-      break;
+      assert(false);
+      return NULL;
     case TOK_VOID:
       return VoidType;
     case TOK_CHAR:
@@ -352,7 +392,7 @@ parseRecordLit(Parser *parser, Token symTok) {
 
   Hashtbl *recordLitFields = newHashtbl(0);
 
-  while (peekToken(parser->lex).type != TOK_RBRACKET) {
+  while (peekToken(parser->lex).type != TOK_RCURLY) {
     Token periodTok = nextToken(parser->lex);
     if (periodTok.type != TOK_PERIOD) {
       queueError("Expected '.' before name of record field", periodTok.start,
@@ -396,6 +436,50 @@ parseRecordLit(Parser *parser, Token symTok) {
 }
 
 static Expr *
+parseArrayLit(Parser *parser) {
+  lexerStepBack(parser->lex);
+
+  Token startTok = peekToken(parser->lex);
+
+  Type *arrayType = parseType(parser);
+
+  Token lBracketTok = nextToken(parser->lex);
+  if (lBracketTok.type != TOK_LBRACKET) {
+    queueError("Expected '[' for array literal", lBracketTok.start,
+               lBracketTok.end);
+    printErrors();
+  }
+
+  Vector *items = newVector(sizeof(Expr *), 0);
+
+  for (;;) {
+    Expr *tempExpr = parseExpr(parser);
+    pushVector(items, &tempExpr);
+
+    if (peekToken(parser->lex).type == TOK_COMMA) {
+      nextToken(parser->lex);
+    } else {
+      break;
+    }
+  }
+  Token closingBracketTok = nextToken(parser->lex);
+  if (closingBracketTok.type != TOK_RBRACKET) {
+    queueError("Expected ']' after expression without command in array literal",
+               closingBracketTok.start, closingBracketTok.end);
+    closingBracketTok = continueUntil(parser->lex, TOK_RBRACKET_BITS);
+  }
+
+  Expr *ret = calloc(1, sizeof(Expr));
+  ret->start = startTok.start;
+  ret->end = closingBracketTok.end;
+  ret->type = EXP_ARRAY;
+  ret->array.items = items;
+  ret->array.type = arrayType;
+  ret->array.size = items->numItems;
+  return ret;
+}
+
+static Expr *
 parsePrimary(Parser *parser) {
   Expr *ret;
 
@@ -406,6 +490,8 @@ parsePrimary(Parser *parser) {
       ret->intlit = tok.intnum;
       ret->typeExpr = NULL;
       return ret;
+    case TOK_LBRACKET:
+      return parseArrayLit(parser);
     case TOK_CHARLIT:
       ret = exprFromToken(tok, EXP_CHAR);
       ret->character = tok.character;
@@ -417,7 +503,7 @@ parsePrimary(Parser *parser) {
         case TOK_LPAREN:
           nextToken(parser->lex);
           return parseFuncall(parser, tok);
-        case TOK_LBRACKET:
+        case TOK_LCURLY:
           nextToken(parser->lex);
           return parseRecordLit(parser, tok);
 
@@ -450,7 +536,6 @@ parsePrimary(Parser *parser) {
       return ret;
 
     default:
-      printToken(tok);
       queueError(msprintf("Expected an integer or variable name for "
                           "expressions, not another token"),
                  tok.start, tok.end);
@@ -621,11 +706,10 @@ parseExpr(Parser *parser) {
 
 static Stmt *
 parseDec(Parser *parser, Token nameTok, bool isMut) {
-  Type *type;
+  Type *type = parseType(parser);
 
-  type = parseType(parser);
-
-  Token prev = parser->lex->previousTok;
+  lexerStepBack(parser->lex);
+  Token prev = nextToken(parser->lex);
 
   /* Should either be a semicolon or an equals sign */
   Token equalTok = nextToken(parser->lex);
@@ -633,7 +717,8 @@ parseDec(Parser *parser, Token nameTok, bool isMut) {
   if (equalTok.type == TOK_EQUAL) {
     Expr *exp = parseExpr(parser);
 
-    prev = parser->lex->previousTok;
+    lexerStepBack(parser->lex);
+    prev = nextToken(parser->lex);
 
     Token endingTok = nextToken(parser->lex);
     Stmt *stmt;
@@ -695,6 +780,7 @@ parseDec(Parser *parser, Token nameTok, bool isMut) {
   }
 
   stmt->dec.var = entry;
+  stmt->dec.type = type;
   return stmt;
 }
 
@@ -788,15 +874,17 @@ parseLVal(Parser *parser) {
 
 static Stmt *
 parseCompoundAssign(Parser *parser, LVal *lval, int type) {
-  Expr* expr = parseExpr(parser);
+  Expr *expr = parseExpr(parser);
 
   Token finalTok = nextToken(parser->lex);
   if (finalTok.type != TOK_NEWLINE && finalTok.type != TOK_SEMICOLON) {
-    queueError("Expected newline or semicolon after compound assignment", finalTok.start, finalTok.end);
+    queueError("Expected newline or semicolon after compound assignment",
+               finalTok.start, finalTok.end);
     printErrors();
   }
 
-  Stmt* ret = stmtFromTwoPoints(lval->start, finalTok.end, STMT_COMPOUND_ASSIGN);
+  Stmt *ret =
+      stmtFromTwoPoints(lval->start, finalTok.end, STMT_COMPOUND_ASSIGN);
 
   HashEntry *entry = findInScope(parser->currentScope, getSymbolLVal(lval));
 
@@ -841,8 +929,9 @@ parseAssignment(Parser *parser) {
     case TOK_EQUAL:
       break;
     default:
-      queueError("Expected '=', '+=', '-=', '*=', or '/=' after l-value in assignment", equalTok.start,
-                 equalTok.end);
+      queueError(
+          "Expected '=', '+=', '-=', '*=', or '/=' after l-value in assignment",
+          equalTok.start, equalTok.end);
       equalTok = continueUntil(parser->lex, TOK_EQUAL_BITS);
   }
 

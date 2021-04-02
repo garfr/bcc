@@ -2,6 +2,7 @@
 
 #include <stdarg.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,6 +64,23 @@ compareSymbolStr(Symbol sym, const char *str) {
       return false;
     }
   }
+  return true;
+}
+
+bool
+symbolToInt(Symbol sym, int64_t *out) {
+  const unsigned char *ptr = sym.text;
+  int64_t ret = 0;
+  for (size_t i = 0; i < sym.len; i++) {
+    if (isdigit(*ptr)) {
+      ret *= 10;
+      ret += (*ptr) - '0';
+      ptr++;
+    } else {
+      return false;
+    }
+  }
+  *out = ret;
   return true;
 }
 

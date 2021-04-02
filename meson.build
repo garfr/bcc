@@ -19,5 +19,6 @@ inc = include_directories('include')
 executable(
   'bcc',
   src,
+  c_args : ['-Wextra', '-Werror'],
   include_directories : [inc],
 )

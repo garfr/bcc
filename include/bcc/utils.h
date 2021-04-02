@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /* ------------------------------ Helpers ---------------------------------- */
 
@@ -20,6 +21,10 @@ bool compareSymbol(Symbol sym1, Symbol sym2);
 
 /* Compares a Symbol to a null terminated string */
 bool compareSymbolStr(Symbol sym, const char *str);
+
+/* Converts a symbol to an unsigned 64 bit integer, outputting through the out
+ * parameter and returning false on failure */
+bool symbolToInt(Symbol sym, int64_t *out);
 
 /* ------------------------------ Hashtbl ---------------------------------- */
 

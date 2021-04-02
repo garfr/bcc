@@ -33,7 +33,6 @@ calculateSize(Type *type) {
     case TYP_S64:
     case TYP_U64:
     case TYP_PTR:
-      return 8;
     case TYP_VOID:
       return 0;
     case TYP_FUN:
@@ -53,6 +52,8 @@ calculateSize(Type *type) {
       }
     case TYP_BINDING:
       return calculateSize(type->typeEntry->data);
+    case TYP_ARRAY:
+      return type->array.size * calculateSize(type->array.type);
   }
   printf("Internal compiler error: Reached end of calculateSize without "
          "returning.\n");
@@ -78,7 +79,7 @@ generateType(Type *type) {
     case TYP_U64:
     case TYP_PTR:
     case TYP_FUN:
-
+    case TYP_ARRAY:
       return "l";
     case TYP_VOID:
       return "";
@@ -108,14 +109,12 @@ getNewNum() {
   case TYP_U32:                                                                \
   case TYP_BOOL:                                                               \
   case TYP_INTLIT:                                                             \
-  case TYP_CHAR:                                                               \
-  case TYP_VOID
+  case TYP_CHAR
 
 #define BIG_TYPES                                                              \
   TYP_S64:                                                                     \
   case TYP_U64:                                                                \
   case TYP_FUN:                                                                \
-  case TYP_RECORD:                                                             \
   case TYP_PTR
 
 #define SIGNED_SMALL_TYPES                                                     \
@@ -129,15 +128,13 @@ getNewNum() {
   case TYP_U16:                                                                \
   case TYP_U32:                                                                \
   case TYP_BOOL:                                                               \
-  case TYP_CHAR:                                                               \
-  case TYP_VOID
+  case TYP_CHAR
 
 #define SIGNED_BIG_TYPES TYP_S64
 
 #define UNSIGNED_BIG_TYPES                                                     \
   TYP_U64:                                                                     \
   case TYP_FUN:                                                                \
-  case TYP_RECORD:                                                             \
   case TYP_PTR
 
 /* Picks the correct binary op for a type */
@@ -174,6 +171,9 @@ generateBinaryOp(int op, Type *type) {
           return "ceql";
         case TYP_BINDING:
           return generateBinaryOp(op, type->typeEntry->data);
+        default:
+          assert(false);
+          return NULL;
       }
       break;
     case BINOP_NOTEQUAL:
@@ -184,6 +184,9 @@ generateBinaryOp(int op, Type *type) {
           return "cnel";
         case TYP_BINDING:
           return generateBinaryOp(op, type->typeEntry->data);
+        default:
+          assert(false);
+          return NULL;
       }
       break;
     case BINOP_LESS:
@@ -198,6 +201,9 @@ generateBinaryOp(int op, Type *type) {
           return "csltl";
         case TYP_BINDING:
           return generateBinaryOp(op, type->typeEntry->data);
+        default:
+          assert(false);
+          return NULL;
       }
       break;
     case BINOP_GREAT:
@@ -212,6 +218,9 @@ generateBinaryOp(int op, Type *type) {
           return "csgtl";
         case TYP_BINDING:
           return generateBinaryOp(op, type->typeEntry->data);
+        default:
+          assert(false);
+          return NULL;
       }
       break;
     case BINOP_LESS_EQ:
@@ -226,6 +235,9 @@ generateBinaryOp(int op, Type *type) {
           return "cslel";
         case TYP_BINDING:
           return generateBinaryOp(op, type->typeEntry->data);
+        default:
+          assert(false);
+          return NULL;
       }
       break;
     case BINOP_GREAT_EQ:
@@ -240,6 +252,9 @@ generateBinaryOp(int op, Type *type) {
           return "csgel";
         case TYP_BINDING:
           return generateBinaryOp(op, type->typeEntry->data);
+        default:
+          assert(false);
+          return NULL;
       }
       break;
     default:
@@ -433,6 +448,7 @@ pickLoadInst(Type *type) {
     case TYP_VOID:
     case TYP_INTLIT:
     case TYP_RECORD:
+    case TYP_ARRAY:
       assert(false);
       return NULL;
   }
@@ -465,7 +481,7 @@ pickStoreInst(Type *type) {
     case TYP_VOID:
     case TYP_INTLIT:
     case TYP_RECORD:
-
+    case TYP_ARRAY:
       assert(false);
       return NULL;
   }
@@ -651,67 +667,69 @@ generateExpr(Scope *scope, Expr *expr, bool *needsCopy) {
     case EXP_RECORDLIT:
       printf("No funcalls or record lits yet.\n");
       exit(1);
+    case EXP_ARRAY:
+      return NULL; // This is handled by the actual statement, not the
+                   // expression
   }
   return 0;
 }
 
 static void
-generateCompoundAssign(Scope *scope, Stmt* stmt, bool *needsCopy) {
+generateCompoundAssign(Scope *scope, Stmt *stmt, bool *needsCopy) {
   if (stmt->compound_assign.lval->type == LVAL_VAR) {
 
     TypedEntry *entry = stmt->compound_assign.lval->var.entry->data;
     char *expr = generateExpr(scope, stmt->compound_assign.value, needsCopy);
     if (entry->onStack) {
       int loc1 = getNewNum(); // Stores the old value from the stack
-      int loc2 = getNewNum(); // Stores the expression 
-      int loc3 = getNewNum(); // Stores the new value, that will be stored back into the stack
+      int loc2 = getNewNum(); // Stores the expression
+      int loc3 = getNewNum(); // Stores the new value, that will be stored back
+                              // into the stack
 
       // Fetch the value from the stack
-      fprintf(context.out, "\t%%v%d =%s %s %%%.*s\n", 
-          loc1, 
-          generateType(entry->type), pickLoadInst(entry->type), 
-          (int) stmt->compound_assign.lval->var.sym.len, 
-          stmt->compound_assign.lval->var.sym.text);
+      fprintf(context.out, "\t%%v%d =%s %s %%%.*s\n", loc1,
+              generateType(entry->type), pickLoadInst(entry->type),
+              (int)stmt->compound_assign.lval->var.sym.len,
+              stmt->compound_assign.lval->var.sym.text);
 
       // Calculate the right hand side of the statement
       if (*needsCopy) {
-        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc2, 
-            generateType(stmt->compound_assign.value->typeExpr), expr);
-      }
-      else {
-        fprintf(context.out, "\t%%v%d =%s %s\n", loc2, 
-            generateType(stmt->compound_assign.value->typeExpr), expr);
+        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc2,
+                generateType(stmt->compound_assign.value->typeExpr), expr);
+      } else {
+        fprintf(context.out, "\t%%v%d =%s %s\n", loc2,
+                generateType(stmt->compound_assign.value->typeExpr), expr);
       }
 
-      fprintf(context.out, "\t%%v%d =%s %s %%v%d, %%v%d\n", loc3, 
-          generateType(entry->type), 
-          generateBinaryOp(stmt->compound_assign.op, entry->type), loc1, loc2);
+      fprintf(context.out, "\t%%v%d =%s %s %%v%d, %%v%d\n", loc3,
+              generateType(entry->type),
+              generateBinaryOp(stmt->compound_assign.op, entry->type), loc1,
+              loc2);
 
-      fprintf(context.out, "\t%s %%v%d, %%%.*s\n", 
-          pickStoreInst(entry->type), loc3, 
-          (int) stmt->compound_assign.lval->var.sym.len, 
-          stmt->compound_assign.lval->var.sym.text);
-    }
-    else {
-      int loc1 = getNewNum(); // This stores the right hand expression 
+      fprintf(context.out, "\t%s %%v%d, %%%.*s\n", pickStoreInst(entry->type),
+              loc3, (int)stmt->compound_assign.lval->var.sym.len,
+              stmt->compound_assign.lval->var.sym.text);
+    } else {
+      int loc1 = getNewNum(); // This stores the right hand expression
 
       // Calculate the right hand side of the statement
       if (*needsCopy) {
-        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc1, generateType(stmt->compound_assign.value->typeExpr), expr);
-      }
-      else {
-        fprintf(context.out, "\t%%v%d =%s %s\n", loc1, generateType(stmt->compound_assign.value->typeExpr), expr);
+        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc1,
+                generateType(stmt->compound_assign.value->typeExpr), expr);
+      } else {
+        fprintf(context.out, "\t%%v%d =%s %s\n", loc1,
+                generateType(stmt->compound_assign.value->typeExpr), expr);
       }
 
-      fprintf(context.out, "\t%%%.*s =%s %s %%%.*s, %%v%d\n", (int) stmt->compound_assign.lval->var.sym.len, 
-          stmt->compound_assign.lval->var.sym.text, generateType(entry->type),
-          generateBinaryOp(stmt->compound_assign.op, entry->type),
-          (int) stmt->compound_assign.lval->var.sym.len, 
-          stmt->compound_assign.lval->var.sym.text,
-          loc1);
+      fprintf(context.out, "\t%%%.*s =%s %s %%%.*s, %%v%d\n",
+              (int)stmt->compound_assign.lval->var.sym.len,
+              stmt->compound_assign.lval->var.sym.text,
+              generateType(entry->type),
+              generateBinaryOp(stmt->compound_assign.op, entry->type),
+              (int)stmt->compound_assign.lval->var.sym.len,
+              stmt->compound_assign.lval->var.sym.text, loc1);
     }
-  }
-  else if (stmt->assign.lval->type == LVAL_DEREF) {
+  } else if (stmt->assign.lval->type == LVAL_DEREF) {
 
     TypedEntry *entry = stmt->compound_assign.lval->var.entry->data;
     char *expr = generateExpr(scope, stmt->compound_assign.value, needsCopy);
@@ -719,56 +737,60 @@ generateCompoundAssign(Scope *scope, Stmt* stmt, bool *needsCopy) {
       int loc1 = getNewNum(); // Stores the value of ptr from the stack
       int loc2 = getNewNum(); // Stores the value pointed to by the ptr
       int loc3 = getNewNum(); // Stores the value of the expression
-      int loc4 = getNewNum(); // Stores the new value, that will be stored back into memory 
+      int loc4 = getNewNum(); // Stores the new value, that will be stored back
+                              // into memory
 
-      fprintf(context.out, "\t%%v%d =l loadl %%%.*s\n", loc1, 
-          (int) stmt->compound_assign.lval->deref.sym.len, 
-          stmt->compound_assign.lval->deref.sym.text);
+      fprintf(context.out, "\t%%v%d =l loadl %%%.*s\n", loc1,
+              (int)stmt->compound_assign.lval->deref.sym.len,
+              stmt->compound_assign.lval->deref.sym.text);
 
-      fprintf(context.out, "\t%%v%d =%s %s %%v%d\n", loc2, 
-          generateType(entry->type), pickLoadInst(entry->type), loc1);
+      fprintf(context.out, "\t%%v%d =%s %s %%v%d\n", loc2,
+              generateType(entry->type), pickLoadInst(entry->type), loc1);
 
       if (*needsCopy) {
-        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc3, 
-            generateType(stmt->compound_assign.value->typeExpr), expr);
-      }
-      else {
-        fprintf(context.out, "\t%%v%d =%s %s\n", loc3, 
-            generateType(stmt->compound_assign.value->typeExpr), expr);
+        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc3,
+                generateType(stmt->compound_assign.value->typeExpr), expr);
+      } else {
+        fprintf(context.out, "\t%%v%d =%s %s\n", loc3,
+                generateType(stmt->compound_assign.value->typeExpr), expr);
       }
 
       fprintf(context.out, "\t%%v%d =%s %s %%v%d, %%v%d\n", loc4,
-          generateType(entry->type),  generateBinaryOp(stmt->compound_assign.op, entry->type),
-          loc2, loc3);
+              generateType(entry->type),
+              generateBinaryOp(stmt->compound_assign.op, entry->type), loc2,
+              loc3);
 
-      fprintf(context.out, "\t%s %%v%d, %%v%d\n", pickStoreInst(entry->type), loc4, loc2);
-  }
-  else {
-    int loc1 = getNewNum(); // Stores the value pointed to by the variable
-    int loc2 = getNewNum(); // Stores the value of the expression
-    int loc3 = getNewNum(); // Stores the new value, that will be stored back into memory 
+      fprintf(context.out, "\t%s %%v%d, %%v%d\n", pickStoreInst(entry->type),
+              loc4, loc2);
+    } else {
+      int loc1 = getNewNum(); // Stores the value pointed to by the variable
+      int loc2 = getNewNum(); // Stores the value of the expression
+      int loc3 = getNewNum(); // Stores the new value, that will be stored back
+                              // into memory
 
-    fprintf(context.out, "\t%%v%d =%s %s %%%.*s\n", loc1, generateType(entry->type->ptr.type),
-        pickLoadInst(entry->type), (int) stmt->compound_assign.lval->deref.sym.len,
-        stmt->compound_assign.lval->deref.sym.text);
+      fprintf(context.out, "\t%%v%d =%s %s %%%.*s\n", loc1,
+              generateType(entry->type->ptr.type), pickLoadInst(entry->type),
+              (int)stmt->compound_assign.lval->deref.sym.len,
+              stmt->compound_assign.lval->deref.sym.text);
 
       if (*needsCopy) {
-        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc2, 
-            generateType(stmt->compound_assign.value->typeExpr), expr);
-      }
-      else {
-        fprintf(context.out, "\t%%v%d =%s %s\n", loc2, 
-            generateType(stmt->compound_assign.value->typeExpr), expr);
+        fprintf(context.out, "\t%%v%d =%s copy %s\n", loc2,
+                generateType(stmt->compound_assign.value->typeExpr), expr);
+      } else {
+        fprintf(context.out, "\t%%v%d =%s %s\n", loc2,
+                generateType(stmt->compound_assign.value->typeExpr), expr);
       }
 
-      fprintf(context.out, "\t%%v%d =%s %s %%v%d, %%v%d\n", loc3, 
-          generateType(entry->type->ptr.type), generateBinaryOp(stmt->compound_assign.op, entry->type->ptr.type),
-          loc1, loc2);
+      fprintf(context.out, "\t%%v%d =%s %s %%v%d, %%v%d\n", loc3,
+              generateType(entry->type->ptr.type),
+              generateBinaryOp(stmt->compound_assign.op, entry->type->ptr.type),
+              loc1, loc2);
 
-      fprintf(context.out, "\t%s %%v%d, %%%.*s\n", pickStoreInst(entry->type->ptr.type),
-          loc3, (int) stmt->compound_assign.lval->deref.sym.len,
-          stmt->compound_assign.lval->deref.sym.text);
-  }
+      fprintf(context.out, "\t%s %%v%d, %%%.*s\n",
+              pickStoreInst(entry->type->ptr.type), loc3,
+              (int)stmt->compound_assign.lval->deref.sym.len,
+              stmt->compound_assign.lval->deref.sym.text);
+    }
   }
 }
 static void
@@ -847,7 +869,37 @@ generateDecAssign(Scope *scope, Stmt *stmt, bool *needsCopy) {
   TypedEntry *entry = stmt->dec_assign.var->data;
   char *expr = generateExpr(scope, stmt->dec_assign.value, needsCopy);
 
-  if (entry->onStack) {
+  if (stmt->dec_assign.value->typeExpr->type == TYP_ARRAY) {
+    fprintf(context.out, "\t%%%.*s =l alloc4 %ld\n",
+            (int)stmt->dec_assign.var->id.len, stmt->dec_assign.var->id.text,
+            calculateSize(stmt->dec_assign.value->typeExpr));
+
+    int indexer = getNewNum();
+    fprintf(context.out, "\t%%v%d =l copy %%%.*s\n", indexer,
+            (int)stmt->dec_assign.var->id.len, stmt->dec_assign.var->id.text);
+
+    for (size_t i = 0; i < stmt->dec_assign.value->array.items->numItems; i++) {
+      Expr *tempExpr =
+          *((Expr **)indexVector(stmt->dec_assign.value->array.items, i));
+      char *exprStr = generateExpr(scope, tempExpr, needsCopy);
+      if (needsOwnInstruction(tempExpr)) {
+        int tempLoc = getNewNum();
+        if (*needsCopy) {
+          fprintf(context.out, "\t%%v%d =%s copy %s\n", tempLoc,
+                  generateType(tempExpr->typeExpr), exprStr);
+        } else {
+          fprintf(context.out, "\t%%v%d =%s %s\n", tempLoc,
+                  generateType(tempExpr->typeExpr), exprStr);
+        }
+        exprStr = msprintf("%%v%d", tempLoc);
+      }
+      fprintf(context.out, "\t%s %s, %%v%d\n",
+              pickStoreInst(stmt->dec_assign.value->typeExpr->array.type),
+              exprStr, indexer);
+      fprintf(context.out, "\t%%v%d =l add %%v%d, %ld\n", indexer, indexer,
+              calculateSize(stmt->dec_assign.value->typeExpr->array.type));
+    }
+  } else if (entry->onStack) {
     fprintf(context.out, "\t%%%.*s =l alloc4 %ld\n",
             (int)stmt->dec_assign.var->id.len, stmt->dec_assign.var->id.text,
             calculateSize(stmt->dec_assign.type));
@@ -865,9 +917,7 @@ generateDecAssign(Scope *scope, Stmt *stmt, bool *needsCopy) {
             pickStoreInst(stmt->dec_assign.type), loc,
             (int)stmt->dec_assign.var->id.len, stmt->dec_assign.var->id.text);
 
-  }
-
-  else {
+  } else {
     if (*needsCopy) {
       fprintf(context.out, "\t%%%.*s =%s copy %s\n",
               (int)stmt->dec_assign.var->id.len, stmt->dec_assign.var->id.text,
@@ -883,7 +933,7 @@ generateDecAssign(Scope *scope, Stmt *stmt, bool *needsCopy) {
 static void
 generateStatement(Scope *scope, Stmt *stmt) {
 
-  bool needsCopy;
+  bool needsCopy = false;
   switch (stmt->type) {
     case STMT_DEC:
       {
@@ -892,7 +942,6 @@ generateStatement(Scope *scope, Stmt *stmt) {
           fprintf(context.out, "\t%%%.*s =l alloc4 %ld\n",
                   (int)stmt->dec.var->id.len, stmt->dec.var->id.text,
                   calculateSize(stmt->dec.type));
-          printType(stmt->dec.type);
         }
         break;
       }
@@ -952,8 +1001,6 @@ generateStatement(Scope *scope, Stmt *stmt) {
 
         char *expr = generateExpr(scope, stmt->while_block.cond, &needsCopy);
         int value1 = getNewNum();
-
-
 
         if (needsCopy) {
           fprintf(context.out, "\t%%v%d =%s copy %s\n", value1,

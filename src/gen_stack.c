@@ -24,6 +24,14 @@ checkStackExpr(Scope *scope, Expr *exp) {
     case EXP_DEREF:
       checkStackExpr(scope, exp->deref);
       break;
+    case EXP_ARRAY:
+      {
+        for (size_t i = 0; i < exp->array.items->numItems; i++) {
+          Expr *tempExpr = *((Expr **)indexVector(exp->array.items, i));
+          checkStackExpr(scope, tempExpr);
+        }
+        break;
+      }
     case EXP_FUNCALL:
       {
         for (size_t i = 0; i < exp->funcall.arguments->numItems; i++) {
@@ -61,6 +69,9 @@ checkStackStmt(Scope *scope, Stmt *stmt) {
       checkStackExpr(scope, stmt->singleExpr);
       break;
     case STMT_DEC:
+      if (stmt->dec.type->type == TYP_ARRAY) {
+        ((TypedEntry *)stmt->dec.var->data)->onStack = true;
+      }
       break;
     case STMT_ASSIGN:
       checkStackExpr(scope, stmt->assign.value);

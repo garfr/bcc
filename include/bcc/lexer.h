@@ -103,15 +103,13 @@ enum LexerState {
 };
 
 typedef struct {
-  const unsigned char *buffer;
-  size_t bufferLen;
-  size_t startIdx;
-  size_t endIdx;
-  enum LexerState state;
-  Token previousTok;
+  Vector *toks; // Token
+  size_t currTok;
 } Lexer;
 
 Lexer newLexer(const unsigned char *buffer, size_t bufferLen);
 Token nextToken(Lexer *lex);
+Token previousTok(Lexer *lex);
 Token lookaheadToken(Lexer *lex);
 Token peekToken(Lexer *lex);
+void lexerStepBack(Lexer *lex);

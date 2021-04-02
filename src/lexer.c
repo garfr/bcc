@@ -7,21 +7,21 @@
 #include <string.h>
 
 #include "bcc/error.h"
+#include "bcc/pp.h"
 
-Lexer
-newLexer(const unsigned char *buffer, size_t bufferLen) {
-  Lexer ret;
-  ret.buffer = buffer;
-  ret.bufferLen = bufferLen;
-  ret.startIdx = ret.endIdx = 0;
-  ret.state = LEX_START;
-  return ret;
-}
+typedef struct {
+  const unsigned char *buffer;
+  size_t bufferLen;
+  size_t startIdx;
+  size_t endIdx;
+  enum LexerState state;
+  Token previousTok;
+} LexerCtx;
 
 /* Generates a token in the location the lexer is in currently, moves the lexer
  * forward, and resets the lexer to begin tokenizing then next token */
 static Token
-makeTokenInplace(Lexer *lex, enum TokenType type) {
+makeTokenInplace(LexerCtx *lex, enum TokenType type) {
   Token tok =
       (Token){.start = lex->startIdx, .end = lex->endIdx, .type = type, {}};
   lex->endIdx++;
@@ -31,7 +31,7 @@ makeTokenInplace(Lexer *lex, enum TokenType type) {
 }
 
 static Token
-makeTokenBehind(Lexer *lex, enum TokenType type) {
+makeTokenBehind(LexerCtx *lex, enum TokenType type) {
   Token tok =
       (Token){.start = lex->startIdx, .end = lex->endIdx - 1, .type = type, {}};
   lex->startIdx = lex->endIdx;
@@ -41,7 +41,7 @@ makeTokenBehind(Lexer *lex, enum TokenType type) {
 /* Generates a symbol token one character behind where the lexer is currently,
  * and resets the lexer to begin tokenizing then next token */
 static Token
-makeSymbolBehind(Lexer *lex) {
+makeSymbolBehind(LexerCtx *lex) {
   Symbol sym = (Symbol){.text = &lex->buffer[lex->startIdx],
                         .len = lex->endIdx - lex->startIdx};
 
@@ -104,7 +104,7 @@ makeSymbolBehind(Lexer *lex) {
 
 /* Works the same as makeSymbolBehind but with integers */
 static Token
-makeIntBehind(Lexer *lex) {
+makeIntBehind(LexerCtx *lex) {
   Symbol sym = (Symbol){.text = &lex->buffer[lex->startIdx],
                         .len = lex->endIdx - lex->startIdx};
 
@@ -122,7 +122,7 @@ makeIntBehind(Lexer *lex) {
 }
 
 static Token
-makeCharBehind(Lexer *lex) {
+makeCharBehind(LexerCtx *lex) {
   Symbol sym = (Symbol){.text = &lex->buffer[lex->startIdx],
                         .len = lex->endIdx - lex->startIdx};
 
@@ -141,7 +141,7 @@ makeCharBehind(Lexer *lex) {
 }
 
 static bool
-newlineNeeded(Lexer *lex) {
+newlineNeeded(LexerCtx *lex) {
   switch (lex->previousTok.type) {
     case TOK_INT:
     case TOK_SYM:
@@ -161,7 +161,7 @@ newlineNeeded(Lexer *lex) {
 }
 
 static void
-skipline(Lexer *lex) {
+skipline(LexerCtx *lex) {
   for (; lex->endIdx <= lex->bufferLen && lex->buffer[lex->endIdx] != '\n';
        lex->endIdx++) {
     lex->startIdx = lex->endIdx;
@@ -170,7 +170,7 @@ skipline(Lexer *lex) {
 
 /* Big and messy but works well and is actually reasonably readable */
 static Token
-getToken(Lexer *lex) {
+getTokenInner(LexerCtx *lex) {
   for (;;) {
     switch (lex->state) {
       case LEX_START:
@@ -441,23 +441,64 @@ getToken(Lexer *lex) {
 }
 
 Token
+getToken(LexerCtx *ctx) {
+  Token tok = getTokenInner(ctx);
+  ctx->previousTok = tok;
+  return tok;
+}
+
+Lexer
+newLexer(const unsigned char *buffer, size_t bufferLen) {
+
+  LexerCtx ctx;
+  ctx.buffer = buffer;
+  ctx.bufferLen = bufferLen;
+  ctx.endIdx = 0;
+  ctx.startIdx = 0;
+  ctx.state = LEX_START;
+
+  Vector *toks = newVector(sizeof(Token), 0);
+  for (;;) {
+
+    Token temp = getToken(&ctx);
+    if (temp.type == TOK_EOF) {
+      pushVector(toks, &temp);
+      break;
+    }
+    pushVector(toks, &temp);
+  }
+  return (Lexer){.toks = toks, .currTok = 0};
+}
+
+Token
 nextToken(Lexer *lex) {
-  return lex->previousTok = getToken(lex);
+  if (lex->currTok >= lex->toks->numItems) {
+    return *((Token *)indexVector(lex->toks, lex->toks->numItems - 1));
+  } else {
+    return *((Token *)indexVector(lex->toks, lex->currTok++));
+  }
 }
 
 Token
 peekToken(Lexer *lex) {
-  Lexer old = *lex;
-  Token ret = getToken(lex);
-  *lex = old;
-  return ret;
+  if (lex->currTok >= lex->toks->numItems) {
+    return *((Token *)indexVector(lex->toks, lex->toks->numItems - 1));
+  } else {
+    return *((Token *)indexVector(lex->toks, lex->currTok));
+  }
 }
 
 Token
 lookaheadToken(Lexer *lex) {
-  Lexer old = *lex;
-  nextToken(lex);
-  Token ret = getToken(lex);
-  *lex = old;
-  return ret;
+  if (lex->currTok + 1 >= lex->toks->numItems) {
+    return *((Token *)indexVector(lex->toks, lex->toks->numItems - 1));
+  } else {
+    return *((Token *)indexVector(lex->toks, lex->currTok + 1));
+  }
 }
+
+void
+lexerStepBack(Lexer *lex) {
+  lex->currTok--;
+}
+

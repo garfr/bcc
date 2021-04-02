@@ -30,6 +30,14 @@ resolveExpr(Scope *scope, Expr *exp) {
       resolveExpr(scope, exp->binop.exp1);
       resolveExpr(scope, exp->binop.exp2);
       break;
+    case EXP_ARRAY:
+      {
+        for (size_t i = 0; i < exp->array.items->numItems; i++) {
+          Expr *tempExpr = *((Expr **)indexVector(exp->array.items, i));
+          resolveExpr(scope, tempExpr);
+        }
+        break;
+      }
     case EXP_ADDROF:
       resolveExpr(scope, exp->addr.expr);
       break;

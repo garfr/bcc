@@ -25,6 +25,7 @@ typedef struct Type {
     TYP_FUN,
     TYP_BOOL,
     TYP_PTR,
+    TYP_ARRAY,
     // A binding of a more complex type to a single name
     TYP_BINDING,
   } type;
@@ -44,6 +45,11 @@ typedef struct Type {
       bool mut;
       struct Type *type;
     } ptr;
+
+    struct {
+      int64_t size;
+      struct Type *type;
+    } array;
   };
 } Type;
 
@@ -64,6 +70,7 @@ typedef struct Expr {
     EXP_BINOP,
     EXP_FUNCALL,
     EXP_BOOL,
+    EXP_ARRAY,
     EXP_RECORDLIT
   } type;
 
@@ -110,6 +117,12 @@ typedef struct Expr {
       HashEntry *type;
       Hashtbl *fields;
     } reclit;
+
+    struct {
+      Vector *items; // Expr*
+      Type *type;
+      int64_t size;
+    } array;
   };
 } Expr;
 
