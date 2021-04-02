@@ -591,6 +591,14 @@ typeStmt(Scope *scope, Stmt *stmt) {
         TypedEntry *entry = stmt->dec_assign.var->data;
         entry->type = type;
       }
+      if (stmt->dec_assign.type->type == TYP_ARRAY) {
+        if (stmt->dec_assign.value->type != EXP_ARRAY) {
+          queueError("Cannot assign a non-array literal to an array. Maybe you "
+                     "want a slice?",
+                     stmt->start, stmt->end);
+          printErrors();
+        }
+      }
       break;
     case STMT_RETURN:
       {

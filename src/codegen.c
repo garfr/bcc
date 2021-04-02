@@ -294,15 +294,16 @@ translateCharacter(Symbol sym) {
   if (sym.len >= 1) {
     if (sym.text[0] == '\\') {
 
-      if (sym.text[1] == 'n') {
-
+      if (sym.text[1] == 'n')
         return 10;
-      }
+      if (sym.text[1] == '0')
+        return 0;
+
     } else {
       return (int)sym.text[0];
     }
   }
-  printf("Symbol too short.\n");
+  printf("Symbol: '%.*s' too short.\n", (int)sym.len, sym.text);
   exit(1);
 }
 
